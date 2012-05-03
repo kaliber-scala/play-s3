@@ -1,5 +1,5 @@
 <projectDescription>
-  <name>s3</name>
+  <name>api-s3</name>
   <buildSpec>
     <buildCommand>
       <name>org.scala-ide.sdt.core.scalabuilder</name>

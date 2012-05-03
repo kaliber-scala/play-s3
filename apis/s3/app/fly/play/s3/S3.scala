@@ -94,8 +94,8 @@ object S3 {
 
   object keys {
 
-    lazy val id = playConfiguration("s3.id").getOrElse(throw PlayException("Configuration error", "Could not find s3.id in settings"))
-    lazy val secret = playConfiguration("s3.secret").getOrElse(throw PlayException("Configuration error", "Could not find s3.secret in settings"))
+    lazy val id = playConfiguration("s3.id")
+    lazy val secret = playConfiguration("s3.secret")
 
   }
 }
