@@ -35,7 +35,6 @@
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\commons-lang\commons-lang\2.6\jars\commons-lang.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\com.ning\async-http-client\1.7.0\jars\async-http-client.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\oauth.signpost\signpost-core\1.2.1.1\jars\signpost-core.jar" kind="lib"></classpathentry>
-  <classpathentry path="C:\play\play-2.0\framework\..\repository\local\commons-codec\commons-codec\1.3\jars\commons-codec.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\com.codahale\jerkson_2.9.1\0.5.0\jars\jerkson_2.9.1.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\org.codehaus.jackson\jackson-core-asl\1.9.5\jars\jackson-core-asl.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\org.codehaus.jackson\jackson-mapper-asl\1.9.5\jars\jackson-mapper-asl.jar" kind="lib"></classpathentry>
@@ -45,8 +44,7 @@
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\tyrex\tyrex\1.0.1\jars\tyrex.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\jaxen\jaxen\1.1.3\jars\jaxen.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\net.sf.ehcache\ehcache-core\2.5.0\jars\ehcache-core.jar" kind="lib"></classpathentry>
-  <classpathentry path="C:\play\play-2.0\framework\..\repository\local\nl.rhinofly\api-utils_2.9.1\1.0\jars\api-utils_2.9.1.jar" kind="lib"></classpathentry>
-  <classpathentry path="C:\play\play-2.0\framework\..\repository\local\play\play-test_2.9.1\2.0\jars\play-test_2.9.1.jar" kind="lib"></classpathentry>
+  <classpathentry path="C:\play\play-2.0\framework\..\repository\cache\nl.rhinofly\api-utils_2.9.1\jars\api-utils_2.9.1-1.0-SNAPSHOT.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\org.specs2\specs2_2.9.1\1.7.1\jars\specs2_2.9.1.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\org.specs2\specs2-scalaz-core_2.9.1\6.0.1\jars\specs2-scalaz-core_2.9.1.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\com.novocode\junit-interface\0.8\jars\junit-interface.jar" kind="lib"></classpathentry>
@@ -87,6 +85,7 @@
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\org.seleniumhq.selenium\selenium-support\2.16.1\jars\selenium-support.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\org.easytesting\fest-assert\1.4\jars\fest-assert.jar" kind="lib"></classpathentry>
   <classpathentry path="C:\play\play-2.0\framework\..\repository\local\org.easytesting\fest-util\1.1.6\jars\fest-util.jar" kind="lib"></classpathentry>
+  <classpathentry path="C:\play\play-2.0\framework\..\repository\local\play\play-test_2.9.1\2.0\jars\play-test_2.9.1.jar" kind="lib"></classpathentry>
   <classpathentry path="org.eclipse.jdt.launching.JRE_CONTAINER" kind="con"></classpathentry>
   <classpathentry path="bin" kind="output"></classpathentry>
   <classpathentry path="C:\git\play-libraries\apis\s3\target\scala-2.9.1\classes_managed" kind="lib"></classpathentry>
