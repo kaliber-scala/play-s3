@@ -15,10 +15,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import scala.xml.Elem
 
+/**
+ * Simple Storage Service
+ */
 object S3 {
-
-  /** Default is ".s3.amazonaws.com/" */
-  var endPoint = ".s3.amazonaws.com/"
 
   def apply(bucketName: String): Bucket = new Bucket(bucketName)
   def apply(bucketName: String, delimiter: String): Bucket = new Bucket(bucketName, Some(delimiter))
@@ -66,7 +66,7 @@ object S3 {
   }
 
   private def construct(bucketName: String, path: String, headers: List[(String, String)], authorization: String) =
-    WS.url("http://" + bucketName + endPoint + path)
+    WS.url("http://" + bucketName + ".s3.amazonaws.com/" + path)
       .withHeaders((headers ::: /* add default headers */ List("Date" -> date, "Authorization" -> authorization)): _*)
 
   private[s3] def prepare(bucketName: String, bucketFile: BucketFile, verb: String): WS.WSRequestHolder = {
