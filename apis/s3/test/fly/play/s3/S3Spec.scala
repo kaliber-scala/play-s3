@@ -4,17 +4,27 @@ import org.specs2.mutable._
 import play.api.test._
 import play.api.test.Helpers._
 import play.api.libs.concurrent.Promise
+import java.io.File
+import fly.play.aws.auth.AwsCredentials
+import fly.play.aws.auth.SimpleAwsCredentials
 
 
 class S3Spec extends Specification with Before {
   
-	def before = play.api.Play.start(FakeApplication())
+	def before = play.api.Play.start(FakeApplication(new File("./test")))
   
 	val testBucketName = "s3playlibrary.rhinofly.net"
   
 		"S3" should {
 		 "return an instance of bucket" in {
 		   S3(testBucketName) must beAnInstanceOf[Bucket]
+		 }
+		 
+		 "return an instance of bucket with different credentials" in {
+		   implicit val awsCredentials = SimpleAwsCredentials("test", "test")
+		   val bucket = S3(testBucketName)
+		   
+		   bucket.credentials must_== awsCredentials
 		 }
 		}
 		

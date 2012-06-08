@@ -1,6 +1,5 @@
 package fly.play.s3
 
-import fly.play.utils.PlayUtils._
 import play.api.Play.current
 import play.api.PlayException
 import play.api.libs.concurrent.Akka
@@ -14,118 +13,73 @@ import javax.crypto.spec.SecretKeySpec
 import java.text.SimpleDateFormat
 import java.util.Date
 import scala.xml.Elem
+import fly.play.libraryUtils.PlayConfiguration
+import fly.play.aws.auth.AwsCredentials
+import fly.play.aws.Aws
+import play.api.libs.ws.Response
 
 /**
  * Simple Storage Service
  */
 object S3 {
 
-  def apply(bucketName: String): Bucket = new Bucket(bucketName)
-  def apply(bucketName: String, delimiter: String): Bucket = new Bucket(bucketName, Some(delimiter))
+  def apply(bucketName: String)(implicit credentials: AwsCredentials) = Bucket(credentials, bucketName)
+  def apply(bucketName: String, delimiter: String)(implicit credentials: AwsCredentials) = Bucket(credentials, bucketName, Some(delimiter))
 
-  private lazy val dateFormatter = {
-    val dateFormatter = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss '+0000'", java.util.Locale.ENGLISH)
-    dateFormatter.setTimeZone(java.util.TimeZone.getTimeZone("UTC"))
-    dateFormatter
-  }
-
-  private def date: String = dateFormatter.format(new Date())
-
-  private object authorization {
-
-    private def hmacSha1(data: String): Array[Byte] = {
-      val mac = Mac.getInstance("HmacSHA1")
-      mac.init(new SecretKeySpec(S3.keys.secret.getBytes, mac.getAlgorithm))
-      mac.doFinal(data.getBytes)
-    }
-
-    private def base64(data: Array[Byte]): String = new String(Base64.encodeBase64(data), "UTF-8");
-
-    def md5(bytes: Array[Byte]): String = {
-      val md = java.security.MessageDigest.getInstance("MD5")
-      md.update(bytes)
-      base64(md.digest)
-    }
-
-    //http://s3.amazonaws.com/doc/s3-developer-guide/RESTAuthentication.html
-    def apply(verb: String, resource: String, amzHeaders: Option[String], contentMd5: Option[String], contentType: Option[String]): String = {
-      val stringToSign =
-        verb + "\n" +
-          contentMd5.getOrElse("") + "\n" +
-          contentType.getOrElse("") + "\n" +
-          date + "\n" +
-          amzHeaders.map(_ + "\n").getOrElse("") +
-          resource
-
-      //can not use logger in test (will be fixed in next release of play) uncomment line below to check signature for debugging
-      //println(stringToSign)
-
-      "AWS " + S3.keys.id + ":" + base64(hmacSha1(
-        stringToSign))
-    }
-  }
-
-  private def construct(bucketName: String, path: String, headers: List[(String, String)], authorization: String) =
-    WS.url("http://" + bucketName + ".s3.amazonaws.com/" + path)
-      .withHeaders((headers ::: /* add default headers */ List("Date" -> date, "Authorization" -> authorization)): _*)
-
-  private[s3] def prepare(bucketName: String, bucketFile: BucketFile, verb: String): WS.WSRequestHolder = {
+  private[s3] def put(credentials: AwsCredentials, bucketName: String, bucketFile: BucketFile): Promise[Response] = {
     val acl: String = bucketFile.acl.value
-    val contentMd5 = authorization.md5(bucketFile.content)
 
-    construct(
-      bucketName,
-      bucketFile.name,
-      List(
-        "x-amz-acl" -> acl,
-        "Content-Type" -> bucketFile.contentType,
-        "Content-MD5" -> contentMd5,
-        "Content-Length" -> bucketFile.content.size.toString),
-      authorization(verb, "/" + bucketName + "/" + bucketFile.name, Some("x-amz-acl:" + acl), Some(contentMd5), Some(bucketFile.contentType)))
+    Aws
+      .withSigner(S3Signer(credentials))
+      .url("http://" + bucketName + ".s3.amazonaws.com/" + bucketFile.name)
+      .withHeaders("X-Amz-acl" -> acl)
+      .put(bucketFile.content)
   }
 
-  private[s3] def prepare(bucketName: String, path: Option[String], prefix: Option[String], delimiter: Option[String], verb: String): WS.WSRequestHolder = {
-    val actualPath = path getOrElse ""
-    construct(bucketName,
-      actualPath + List(prefix.map("prefix=" + _), delimiter.map("delimiter=" + _)).flatten.reduceOption(_ + "&" + _).map("?" + _).getOrElse(""),
-      Nil,
-      authorization(verb, "/" + bucketName + "/" + actualPath, None, None, None))
-  }
+  private[s3] def get(credentials: AwsCredentials, bucketName: String, path: Option[String], prefix: Option[String], delimiter: Option[String]): Promise[Response] =
+    Aws
+      .withSigner(S3Signer(credentials))
+      .url("http://" + bucketName + ".s3.amazonaws.com/" + path.getOrElse(""))
+      .withQueryString(
+        (prefix.map("prefix" -> _).toList :::
+          delimiter.map("delimiter" -> _).toList): _*)
+      .get
 
-  object keys {
-
-    lazy val id = playConfiguration("s3.id")
-    lazy val secret = playConfiguration("s3.secret")
-
-  }
+      private[s3] def delete(credentials: AwsCredentials, bucketName: String, path: Option[String]): Promise[Response] =
+      Aws
+      .withSigner(S3Signer(credentials))
+      .url("http://" + bucketName + ".s3.amazonaws.com/" + path.getOrElse(""))
+    			  .delete
+    			  
 }
 
 case class Error(status: Int, code: String, message: String, xml: Elem)
 case class Success()
 
-class Bucket(
-  val name: String,
-  val delimiter: Option[String] = Some("/")) {
+case class Bucket(
+  credentials: AwsCredentials,
+  name: String,
+  delimiter: Option[String] = Some("/")) {
 
   def get(itemName: String): Promise[Either[Error, BucketFile]] =
-    S3.prepare(name, Some(itemName), None, None, "GET").get() map convertResponse { r =>
+    S3.get(credentials, name, Some(itemName), None, None) map convertResponse { r =>
       BucketFile(itemName, r.header("Content-Type").get, r.ahcResponse.getResponseBodyAsBytes)
     }
 
   def list: Promise[Either[Error, Iterable[BucketItem]]] =
-    S3.prepare(name, None, None, delimiter, "GET").get() map listResponse
+    S3.get(credentials, name, None, None, delimiter) map listResponse
 
   def list(prefix: String): Promise[Either[Error, Iterable[BucketItem]]] =
-    S3.prepare(name, None, Some(prefix), delimiter, "GET").get() map listResponse
+    S3.get(credentials, name, None, Some(prefix), delimiter) map listResponse
 
   def +(bucketFile: BucketFile): Promise[Either[Error, Success]] =
-    S3.prepare(name, bucketFile, "PUT").put(bucketFile.content) map response
+    S3.put(credentials, name, bucketFile) map response
 
   def -(itemName: String): Promise[Either[Error, Success]] =
-    S3.prepare(name, Some(itemName), None, None, "DELETE").delete() map response
+    S3.delete(credentials, name, Some(itemName)) map response
 
-  def withDelimiter(delimiter: String): Bucket = new Bucket(name, Some(delimiter))
-  def withDelimiter(delimiter: Option[String]): Bucket = new Bucket(name, delimiter)
+  def withDelimiter(delimiter: String): Bucket = copy(delimiter = Some(delimiter))
+  def withDelimiter(delimiter: Option[String]): Bucket = copy(delimiter = delimiter)
 
   private def convertResponse[T](converter: Response => T)(r: Response): Either[Error, T] =
     r.status match {
