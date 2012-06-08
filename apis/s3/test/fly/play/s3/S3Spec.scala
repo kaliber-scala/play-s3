@@ -7,6 +7,7 @@ import play.api.libs.concurrent.Promise
 import java.io.File
 import fly.play.aws.auth.AwsCredentials
 import fly.play.aws.auth.SimpleAwsCredentials
+import fly.play.aws.xml.AwsError
 
 
 class S3Spec extends Specification with Before {
@@ -49,7 +50,7 @@ class S3Spec extends Specification with Before {
 		  "give an error if we request an element that does not exist" in {
 		    bucket.get("nonExistingElement").value.get.fold(
 		        _ match {
-		          case Error(404, "NoSuchKey", _, _) => success
+		          case AwsError(404, "NoSuchKey", _, _) => success
 		          case x => failure("Unexpected error: " + x)
 		        },
 		        {x => failure("Error was expected, no error received: " + x)})
