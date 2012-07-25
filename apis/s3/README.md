@@ -9,7 +9,7 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "api-s3" % "1.0"
+    "nl.rhinofly" %% "api-s3" % "1.1"
   )
   
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
@@ -112,5 +112,10 @@ result.map {
 val result = bucket list "prefix"
 ```
 
+Retrieving a private url:
+
+``` scala
+val url = bucket.url("fileName", expirationFromNowInSeconds)
+```
 
 More examples can be found in the `S3Spec` in the `test` folder

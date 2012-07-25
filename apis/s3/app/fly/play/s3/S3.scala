@@ -47,12 +47,26 @@ object S3 {
           delimiter.map("delimiter" -> _).toList): _*)
       .get
 
-      private[s3] def delete(credentials: AwsCredentials, bucketName: String, path: Option[String]): Promise[Response] =
-      Aws
+  private[s3] def delete(credentials: AwsCredentials, bucketName: String, path: Option[String]): Promise[Response] =
+    Aws
       .withSigner(S3Signer(credentials))
       .url("http://" + bucketName + ".s3.amazonaws.com/" + path.getOrElse(""))
-    			  .delete
-    			  
+      .delete
+
+  private[s3] def url(credentials: AwsCredentials, bucketName: String, path: String, expires: Long): String = {
+    val s3Signer = S3Signer(credentials)
+    val expireString = expires.toString
+
+    val cannonicalRequest = "GET\n\n\n" + expireString + "\n/" + bucketName + "/" + path 
+    val signature = s3Signer.base64Encode(s3Signer.sign(cannonicalRequest, credentials.secretKey))
+
+    "http://" + bucketName + ".s3.amazonaws.com/" + path +
+      "?AWSAccessKeyId=" + credentials.accessKeyId +
+      "&Signature=" + signature +
+      "&Expires=" + expireString
+      
+  }
+
 }
 
 case class Success()
@@ -62,6 +76,12 @@ case class Bucket(
   name: String,
   delimiter: Option[String] = Some("/")) {
 
+  /**
+   * Expires is in seconds from now
+   */
+  def url(itemName:String, expires:Long):String = 
+    S3.url(credentials, name, itemName, ((new Date).getTime / 1000) + expires)
+  
   def get(itemName: String): Promise[Either[AwsError, BucketFile]] =
     S3.get(credentials, name, Some(itemName), None, None) map AwsResponse { (status, response) =>
       BucketFile(itemName, response.header("Content-Type").get, response.ahcResponse.getResponseBodyAsBytes)
@@ -74,9 +94,9 @@ case class Bucket(
     S3.get(credentials, name, None, Some(prefix), delimiter) map listResponse
 
   def + = add _
-  def add(bucketFile: BucketFile): Promise[Either[AwsError, Success]] = 
+  def add(bucketFile: BucketFile): Promise[Either[AwsError, Success]] =
     S3.put(credentials, name, bucketFile) map successResponse
-    
+
   def - = remove _
   def remove(itemName: String): Promise[Either[AwsError, Success]] =
     S3.delete(credentials, name, Some(itemName)) map successResponse
