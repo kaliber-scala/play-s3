@@ -32,7 +32,7 @@ class S3Spec extends Specification with Before {
     }
 
     "create the correct url" in {
-      S3.url(AwsCredentials.fromConfiguration, "s3playlibrary.rhinofly.net", "privateREADME.txt", 1343245068) must_==
+      S3.url("s3playlibrary.rhinofly.net", "privateREADME.txt", 1343245068) must_==
         "http://s3playlibrary.rhinofly.net.s3.amazonaws.com/privateREADME.txt?AWSAccessKeyId=AKIAIJJLEMC6OSI2DN2A&Signature=GaFDqcgkvDbG837m3AR4EBVe1mw=&Expires=1343245068"
     }
   }
@@ -141,7 +141,7 @@ class S3Spec extends Specification with Before {
       url = bucket.url(fileName, 86400)
       val result = bucket + BucketFile(fileName, "text/plain", """
 		        This is a bucket used for testing the S3 module of play
-		        """.getBytes, AUTHENTICATED_READ)
+		        """.getBytes, Some(AUTHENTICATED_READ))
       result.value.get.fold({ e => failure(e.toString) }, { s => success })
     }
 
@@ -149,10 +149,14 @@ class S3Spec extends Specification with Before {
       WS.url(url).get.value.get.status must_== 200
     }
 
-    "be able to delete the private file" in {
-      val result = bucket remove "privateREADME.txt"
+    "be able to rename a file" in {
+    	val result = bucket rename("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
+    	result.value.get.fold({ e => failure(e.toString) }, { s => success })
+    }
+    
+    "be able to delete the renamed private file" in {
+      val result = bucket remove "private2README.txt"
       result.value.get.fold({ e => failure(e.toString) }, { s => success })
     }
-
   }
 }

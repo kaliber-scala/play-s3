@@ -9,7 +9,7 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "api-s3" % "1.1"
+    "nl.rhinofly" %% "api-s3" % "1.2"
   )
   
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
@@ -116,6 +116,17 @@ Retrieving a private url:
 
 ``` scala
 val url = bucket.url("fileName", expirationFromNowInSeconds)
+```
+
+Renaming a file:
+
+``` scala
+val result = bucket rename("oldFileName", "newFileName", ACL)
+
+result.map { 
+  case Left(error) => throw new Exception("Error: " + x)
+  case Right(success) => Logger.info("Renamed the file")
+}
 ```
 
 More examples can be found in the `S3Spec` in the `test` folder

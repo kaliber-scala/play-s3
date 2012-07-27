@@ -5,10 +5,10 @@ import PlayProject._
 object ApplicationBuild extends Build {
 
   val appName = "api-s3"
-  val appVersion = "1.1"
+  val appVersion = "1.2"
 
   val appDependencies = Seq(
-    "nl.rhinofly" %% "api-aws-utils" % "1.1")
+    "nl.rhinofly" %% "api-aws-utils" % "1.3")
 
   def rhinoflyRepo(version: String) = {
     val repo = if (version endsWith "SNAPSHOT") "snapshot" else "release"
