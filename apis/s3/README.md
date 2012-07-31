@@ -9,7 +9,7 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "api-s3" % "1.3"
+    "nl.rhinofly" %% "api-s3" % "1.4"
   )
   
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(

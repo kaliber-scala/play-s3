@@ -109,11 +109,12 @@ object S3 {
     val expireString = expires.toString
 
     val cannonicalRequest = "GET\n\n\n" + expireString + "\n/" + bucketName + "/" + path
-    val signature = S3Signer(credentials).createSignature(cannonicalRequest)
+    val s3Signer = S3Signer(credentials)
+    val signature = s3Signer.createSignature(cannonicalRequest)
 
     httpUrl(bucketName, path) +
       "?AWSAccessKeyId=" + credentials.accessKeyId +
-      "&Signature=" + signature +
+      "&Signature=" + s3Signer.urlEncode(signature) +
       "&Expires=" + expireString
 
   }
