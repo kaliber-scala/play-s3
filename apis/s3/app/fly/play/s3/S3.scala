@@ -19,6 +19,7 @@ import fly.play.aws.Aws
 import play.api.libs.ws.Response
 import fly.play.aws.xml.AwsResponse
 import fly.play.aws.xml.AwsError
+import play.api.http.ContentTypeOf
 
 /**
  * Amazon Simple Storage Service
@@ -54,6 +55,8 @@ object S3 {
 
     require(acl.isDefined, "Can not add a file to a bucket without an ACL defined")
 
+    implicit val fileContentType = ContentTypeOf[Array[Byte]](Some(bucketFile.contentType))
+    
     Aws
       .withSigner(S3Signer(credentials))
       .url(httpUrl(bucketName, bucketFile.name))

@@ -10,6 +10,8 @@ import fly.play.aws.auth.SimpleAwsCredentials
 import fly.play.aws.xml.AwsError
 import fly.play.aws.auth.SimpleAwsCredentials
 import play.api.libs.ws.WS
+import play.api.mvc.Headers
+import play.api.http.HeaderNames
 
 class S3Spec extends Specification with Before {
 
@@ -71,6 +73,11 @@ class S3Spec extends Specification with Before {
       result.value.get.fold({ e => failure(e.toString) }, { s => success })
     }
 
+    "with the correct mime type" in {
+      S3.get(bucket.name, Some("README.txt"), None, None).value.get
+      .header(HeaderNames.CONTENT_TYPE) must_== Some("text/plain")
+    }
+    
     "be able to check if it exists" in {
       bucket.get("README.txt").value.get.fold(
         { e => failure(e.toString) },
