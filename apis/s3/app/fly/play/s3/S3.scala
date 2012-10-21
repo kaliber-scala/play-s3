@@ -57,11 +57,17 @@ object S3 {
 
     implicit val fileContentType = ContentTypeOf[Array[Byte]](Some(bucketFile.contentType))
     
-    Aws
+    val request = Aws
       .withSigner(S3Signer(credentials))
       .url(httpUrl(bucketName, bucketFile.name))
-      .withHeaders("X-Amz-acl" -> acl.get.value)
-      .put(bucketFile.content)
+
+    // Add custom headers
+    val r = bucketFile.headers match {
+      case Some( headers ) => headers.foldLeft(request) { (r, headerNameValue) => r.withHeaders(headerNameValue) }
+      case None => request
+    }
+
+    r.withHeaders("X-Amz-acl" -> acl.get.value).put(bucketFile.content)
   }
 
   /**
@@ -256,7 +262,7 @@ case class BucketItem(name: String, isVirtual: Boolean)
 /**
  * Representation of a file, used in get and add methods of the bucket
  */
-case class BucketFile(name: String, contentType: String, content: Array[Byte], acl: Option[ACL] = Some(PUBLIC_READ))
+case class BucketFile(name: String, contentType: String, content: Array[Byte], headers: Option[Map[String, String]] = None, acl: Option[ACL] = Some(PUBLIC_READ))
 
 case object PUBLIC_READ extends ACL("public-read")
 case object PUBLIC_READ_WRITE extends ACL("public-read-write")

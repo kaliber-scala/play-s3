@@ -83,7 +83,7 @@ class S3Spec extends Specification with Before {
         { e => failure(e.toString) },
         { f =>
           f match {
-            case BucketFile("README.txt", _, _, _) => success
+            case BucketFile("README.txt", _, _, _, _) => success
             case f => failure("Wrong file returned: " + f)
           }
         })
@@ -148,7 +148,7 @@ class S3Spec extends Specification with Before {
       url = bucket.url(fileName, 86400)
       val result = bucket + BucketFile(fileName, "text/plain", """
 		        This is a bucket used for testing the S3 module of play
-		        """.getBytes, Some(AUTHENTICATED_READ))
+		        """.getBytes, None, Some(AUTHENTICATED_READ))
       result.value.get.fold({ e => failure(e.toString) }, { s => success })
     }
 
