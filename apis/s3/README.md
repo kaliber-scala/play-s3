@@ -46,9 +46,11 @@ val bucket = S3("bucketName")(credentials)
 Adding a file:
 
 ``` scala
-val result = bucket + BucketFile(fileName, mimeType, byteArray)
+//not that acl and headers are optional, the default value for acl is set to PUBLIC_READ.
+
+val result = bucket + BucketFile(fileName, mimeType, byteArray, acl, headers)
 //or
-val result = bucket add BucketFile(fileName, mimeType, byteArray)
+val result = bucket add BucketFile(fileName, mimeType, byteArray, acl, headers)
 
 result.map { 
 	case Left(error) => throw new Exception("Error: " + x)
@@ -84,13 +86,13 @@ val result = bucket get "fileName"
 
 result.map { 
 	case Left(error) => throw new Exception("Error: " + x)
-	case Right(BucketFile(name, contentType, content, acl)) => //...
+	case Right(BucketFile(name, contentType, content, acl, headers)) => //...
 }
 //or
 result.value.get.fold(
       { error => throw new Exception("Error: " + error) },
       { file => 
-      	val BucketFile(name, contentType, content, acl) = file
+      	val BucketFile(name, contentType, content, acl, headers) = file
       	//...
       })
 ``` 

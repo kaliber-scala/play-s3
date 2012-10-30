@@ -75,9 +75,9 @@ class S3Spec extends Specification with Before {
 
     "with the correct mime type" in {
       S3.get(bucket.name, Some("README.txt"), None, None).value.get
-      .header(HeaderNames.CONTENT_TYPE) must_== Some("text/plain")
+        .header(HeaderNames.CONTENT_TYPE) must_== Some("text/plain")
     }
-    
+
     "be able to check if it exists" in {
       bucket.get("README.txt").value.get.fold(
         { e => failure(e.toString) },
@@ -148,7 +148,7 @@ class S3Spec extends Specification with Before {
       url = bucket.url(fileName, 86400)
       val result = bucket + BucketFile(fileName, "text/plain", """
 		        This is a bucket used for testing the S3 module of play
-		        """.getBytes, None, Some(AUTHENTICATED_READ))
+		        """.getBytes, Some(AUTHENTICATED_READ), None)
       result.value.get.fold({ e => failure(e.toString) }, { s => success })
     }
 
@@ -157,13 +157,37 @@ class S3Spec extends Specification with Before {
     }
 
     "be able to rename a file" in {
-    	val result = bucket rename("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
-    	result.value.get.fold({ e => failure(e.toString) }, { s => success })
+      val result = bucket rename ("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
+      result.value.get.fold({ e => failure(e.toString) }, { s => success })
     }
-    
+
     "be able to delete the renamed private file" in {
       val result = bucket remove "private2README.txt"
       result.value.get.fold({ e => failure(e.toString) }, { s => success })
     }
+
+    "be able to add a file with custom headers" in {
+      val result = bucket + BucketFile("headerTest.txt", "text/plain", """
+		        This file is used for testing custome headers
+		        """.getBytes, None, Some(Map("x-amz-meta-testHeader" -> "testHeaderValue")))
+      result.value.get.fold({ e => failure(e.toString) }, { s => success })
+    }
+
+    "be able to retrieve a file with custom headers" in {
+      bucket.get("headerTest.txt").value.get.fold(
+        { e => failure(e.toString) },
+        { f =>
+          f match {
+            case BucketFile("headerTest.txt", _, _, _, headers) => (headers get "x-amz-meta-testHeader") must_== Some("testHeaderValue")
+            case f => failure("Wrong file returned: " + f)
+          }
+        })
+    }
+
+    "be able to delete the file with custom headers" in {
+      val result = bucket remove "headerTest.txt"
+      result.value.get.fold({ e => failure(e.toString) }, { s => success })
+    }
+
   }
 }

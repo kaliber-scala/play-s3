@@ -20,6 +20,7 @@ import play.api.libs.ws.Response
 import fly.play.aws.xml.AwsResponse
 import fly.play.aws.xml.AwsError
 import play.api.http.ContentTypeOf
+import scala.collection.JavaConversions
 
 /**
  * Amazon Simple Storage Service
@@ -46,28 +47,22 @@ object S3 {
    * Lowlevel method to call put on a bucket in order to store a file
    *
    * @param bucketName	The name of the bucket
-   * @param bucketFile	The file that you want to store
+   * @param bucketFile	The file that you want to store, if it's acl is None, it's set to PUBLIC_READ
    *
    * @see Bucket.add
    */
   def put(bucketName: String, bucketFile: BucketFile)(implicit credentials: AwsCredentials): Promise[Response] = {
-    val acl: Option[ACL] = bucketFile.acl
-
-    require(acl.isDefined, "Can not add a file to a bucket without an ACL defined")
+    val acl = bucketFile.acl getOrElse PUBLIC_READ
 
     implicit val fileContentType = ContentTypeOf[Array[Byte]](Some(bucketFile.contentType))
-    
-    val request = Aws
+
+    val headers = (bucketFile.headers getOrElse Map.empty).toList
+
+    Aws
       .withSigner(S3Signer(credentials))
       .url(httpUrl(bucketName, bucketFile.name))
-
-    // Add custom headers
-    val r = bucketFile.headers match {
-      case Some( headers ) => headers.foldLeft(request) { (r, headerNameValue) => r.withHeaders(headerNameValue) }
-      case None => request
-    }
-
-    r.withHeaders("X-Amz-acl" -> acl.get.value).put(bucketFile.content)
+      .withHeaders("X-Amz-acl" -> acl.value :: headers: _*)
+      .put(bucketFile.content)
   }
 
   /**
@@ -181,7 +176,21 @@ case class Bucket(
    */
   def get(itemName: String): Promise[Either[AwsError, BucketFile]] =
     S3.get(name, Some(itemName), None, None) map AwsResponse { (status, response) =>
-      BucketFile(itemName, response.header("Content-Type").get, response.ahcResponse.getResponseBodyAsBytes, None)
+      //implicits
+      import JavaConversions.mapAsScalaMap
+      import JavaConversions.asScalaBuffer
+
+      val headers =
+        for {
+          (key, value) <- response.ahcResponse.getHeaders.toMap
+          if (value.size > 0)
+        } yield key -> value.head
+
+      BucketFile(itemName, 
+          headers("Content-Type"), 
+          response.ahcResponse.getResponseBodyAsBytes, 
+          None, 
+          Some(headers))
     }
 
   /**
@@ -230,9 +239,9 @@ case class Bucket(
   def withDelimiter(delimiter: Option[String]): Bucket = copy(delimiter = delimiter)
 
   /**
-   * Allows you to rename a file within this bucket. It will actually do a copy and 
+   * Allows you to rename a file within this bucket. It will actually do a copy and
    * a remove.
-   * 
+   *
    * @param sourceItemName			The old name of the item
    * @param destinationItemName		The new name of the item
    * @param acl						The ACL for the new item, default is PUBLIC_READ
@@ -262,7 +271,7 @@ case class BucketItem(name: String, isVirtual: Boolean)
 /**
  * Representation of a file, used in get and add methods of the bucket
  */
-case class BucketFile(name: String, contentType: String, content: Array[Byte], headers: Option[Map[String, String]] = None, acl: Option[ACL] = Some(PUBLIC_READ))
+case class BucketFile(name: String, contentType: String, content: Array[Byte], acl: Option[ACL] = None, headers: Option[Map[String, String]] = None)
 
 case object PUBLIC_READ extends ACL("public-read")
 case object PUBLIC_READ_WRITE extends ACL("public-read-write")
