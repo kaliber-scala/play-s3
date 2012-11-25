@@ -169,7 +169,7 @@ class S3Spec extends Specification with Before {
     "be able to add a file with custom headers" in {
       val result = bucket + BucketFile("headerTest.txt", "text/plain", """
 		        This file is used for testing custome headers
-		        """.getBytes, None, Some(Map("x-amz-meta-testHeader" -> "testHeaderValue")))
+		        """.getBytes, None, Some(Map("x-amz-meta-testheader" -> "testHeaderValue")))
       result.value.get.fold({ e => failure(e.toString) }, { s => success })
     }
 
@@ -178,7 +178,7 @@ class S3Spec extends Specification with Before {
         { e => failure(e.toString) },
         { f =>
           f match {
-            case BucketFile("headerTest.txt", _, _, _, headers) => (headers get "x-amz-meta-testHeader") must_== Some("testHeaderValue")
+            case BucketFile("headerTest.txt", _, _, _, Some(headers)) => (headers get "x-amz-meta-testheader") must_== Some("testHeaderValue")
             case f => failure("Wrong file returned: " + f)
           }
         })
