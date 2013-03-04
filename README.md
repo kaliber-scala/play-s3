@@ -9,7 +9,7 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "api-s3" % "1.6.1"
+    "nl.rhinofly" %% "api-s3" % "2.6.1"
   )
   
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
@@ -57,7 +57,8 @@ result.map {
 	case Right(success) => Logger.info("Saved the file")
 }
 //or
-result.value.get.fold(
+val value = Await.result(result, 10 seconds)
+value.fold(
       { error => throw new Exception("Error: " + error) },
       { success => Logger.info("Saved the file") })
 ```      
@@ -74,7 +75,8 @@ result.map {
 	case Right(success) => Logger.info("Removed the file")
 }
 //or
-result.value.get.fold(
+val value = Await.result(result, 10 seconds)
+value.fold(
       { error => throw new Exception("Error: " + error) },
       { success => Logger.info("Removed the file") })
 ``` 
@@ -89,7 +91,8 @@ result.map {
 	case Right(BucketFile(name, contentType, content, acl, headers)) => //...
 }
 //or
-result.value.get.fold(
+val value = Await.result(result, 10 seconds)
+value.fold(
       { error => throw new Exception("Error: " + error) },
       { file => 
       	val BucketFile(name, contentType, content, acl, headers) = file

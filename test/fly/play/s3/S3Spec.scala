@@ -1,19 +1,21 @@
 package fly.play.s3
 
-import org.specs2.mutable._
-import play.api.test._
-import play.api.test.Helpers._
-import play.api.libs.concurrent.Promise
 import java.io.File
-import fly.play.aws.auth.AwsCredentials
+
+import scala.concurrent.Await
+import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+
+import org.specs2.mutable.Before
+import org.specs2.mutable.Specification
+
 import fly.play.aws.auth.SimpleAwsCredentials
 import fly.play.aws.xml.AwsError
-import fly.play.aws.auth.SimpleAwsCredentials
-import play.api.libs.ws.WS
-import play.api.mvc.Headers
 import play.api.http.HeaderNames
+import play.api.libs.ws.WS
+import play.api.test.FakeApplication
 
-class S3Spec extends Specification with Before {
+class S3Spec extends Specification with Before with DeactivatedTimeConversions {
 
   sequential
 
@@ -25,7 +27,6 @@ class S3Spec extends Specification with Before {
     "return an instance of bucket" in {
       S3(testBucketName) must beAnInstanceOf[Bucket]
     }
-
     "return an instance of bucket with different credentials" in {
       implicit val awsCredentials = SimpleAwsCredentials("test", "test")
       val bucket = S3(testBucketName)
@@ -58,7 +59,9 @@ class S3Spec extends Specification with Before {
     }
 
     "give an error if we request an element that does not exist" in {
-      bucket.get("nonExistingElement").value.get.fold(
+      val result = bucket.get("nonExistingElement")
+      val value = Await.result(result, 10 seconds)
+      value.fold(
         _ match {
           case AwsError(404, "NoSuchKey", _, _) => success
           case x => failure("Unexpected error: " + x)
@@ -70,16 +73,21 @@ class S3Spec extends Specification with Before {
       val result = bucket + BucketFile("README.txt", "text/plain", """
 		        This is a bucket used for testing the S3 module of play
 		        """.getBytes)
-      result.value.get.fold({ e => failure(e.toString) }, { s => success })
+      val value = Await.result(result, 10 seconds)
+      value.fold({ e => failure(e.toString) }, { s => success })
     }
 
     "with the correct mime type" in {
-      S3.get(bucket.name, Some("README.txt"), None, None).value.get
-        .header(HeaderNames.CONTENT_TYPE) must_== Some("text/plain")
+      val result = S3.get(bucket.name, Some("README.txt"), None, None)
+      val value = Await.result(result, 10 seconds)
+
+      value.header(HeaderNames.CONTENT_TYPE) must_== Some("text/plain")
     }
 
     "be able to check if it exists" in {
-      bucket.get("README.txt").value.get.fold(
+      val result = bucket.get("README.txt")
+      val value = Await.result(result, 10 seconds)
+      value.fold(
         { e => failure(e.toString) },
         { f =>
           f match {
@@ -94,21 +102,26 @@ class S3Spec extends Specification with Before {
       val result = bucket + BucketFile("testPrefix/README.txt", "text/plain", """
 		        This is a bucket used for testing the S3 module of play
 		        """.getBytes)
-      result.value.get.fold({ e => failure(e.toString) }, { s => success })
+      val value = Await.result(result, 10 seconds)
+      value.fold({ e => failure(e.toString) }, { s => success })
     }
 
     "list should be iterable" in {
-      bucket.list must beAnInstanceOf[Promise[Iterable[BucketItem]]]
+      bucket.list must beAnInstanceOf[Future[Iterable[BucketItem]]]
     }
 
     "list should have a size of 2" in {
-      bucket.list.value.get.fold(
+      val result = bucket.list
+      val value = Await.result(result, 10 seconds)
+      value.fold(
         { e => failure(e.toString) },
         { i => i.size must_== 2 })
     }
 
     "list should have the correct contents" in {
-      bucket.list.value.get.fold(
+      val result = bucket.list
+      val value = Await.result(result, 10 seconds)
+      value.fold(
         { e => failure(e.toString) },
         { i =>
           val seq = i.toSeq
@@ -125,7 +138,9 @@ class S3Spec extends Specification with Before {
     }
 
     "list with prefix should return the correct contents" in {
-      bucket.list("testPrefix/").value.get.fold(
+      val result = bucket.list("testPrefix/")
+      val value = Await.result(result, 10 seconds)
+      value.fold(
         { e => failure(e.toString) },
         { i =>
           i.toSeq(0) match {
@@ -138,7 +153,8 @@ class S3Spec extends Specification with Before {
 
     "be able to delete a file" in {
       val result = bucket - "testPrefix/README.txt"
-      result.value.get.fold({ e => failure(e.toString) }, { s => success })
+      val value = Await.result(result, 10 seconds)
+      value.fold({ e => failure(e.toString) }, { s => success })
     }
 
     var url = ""
@@ -149,32 +165,40 @@ class S3Spec extends Specification with Before {
       val result = bucket + BucketFile(fileName, "text/plain", """
 		        This is a bucket used for testing the S3 module of play
 		        """.getBytes, Some(AUTHENTICATED_READ), None)
-      result.value.get.fold({ e => failure(e.toString) }, { s => success })
+      val value = Await.result(result, 10 seconds)
+      value.fold({ e => failure(e.toString) }, { s => success })
     }
 
     "be able to retrieve the private file using the generated url" in {
-      WS.url(url).get.value.get.status must_== 200
+      val result = WS.url(url).get
+      val value = Await.result(result, 10 seconds)
+      value.status must_== 200
     }
 
     "be able to rename a file" in {
       val result = bucket rename ("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
-      result.value.get.fold({ e => failure(e.toString) }, { s => success })
+      val value = Await.result(result, 10 seconds)
+      value.fold({ e => failure(e.toString) }, { s => success })
     }
 
     "be able to delete the renamed private file" in {
       val result = bucket remove "private2README.txt"
-      result.value.get.fold({ e => failure(e.toString) }, { s => success })
+      val value = Await.result(result, 10 seconds)
+      value.fold({ e => failure(e.toString) }, { s => success })
     }
 
     "be able to add a file with custom headers" in {
       val result = bucket + BucketFile("headerTest.txt", "text/plain", """
 		        This file is used for testing custome headers
 		        """.getBytes, None, Some(Map("x-amz-meta-testheader" -> "testHeaderValue")))
-      result.value.get.fold({ e => failure(e.toString) }, { s => success })
+      val value = Await.result(result, 10 seconds)
+      value.fold({ e => failure(e.toString) }, { s => success })
     }
 
     "be able to retrieve a file with custom headers" in {
-      bucket.get("headerTest.txt").value.get.fold(
+      val result = bucket.get("headerTest.txt")
+      val value = Await.result(result, 10 seconds)
+      value.fold(
         { e => failure(e.toString) },
         { f =>
           f match {
@@ -186,8 +210,8 @@ class S3Spec extends Specification with Before {
 
     "be able to delete the file with custom headers" in {
       val result = bucket remove "headerTest.txt"
-      result.value.get.fold({ e => failure(e.toString) }, { s => success })
+      val value = Await.result(result, 10 seconds)
+      value.fold({ e => failure(e.toString) }, { s => success })
     }
-
   }
 }

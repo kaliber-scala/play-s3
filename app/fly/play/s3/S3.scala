@@ -1,25 +1,17 @@
 package fly.play.s3
 
-import play.api.Play.current
-import play.api.PlayException
-import play.api.libs.concurrent.Akka
-import play.api.libs.concurrent.Promise
-import play.api.libs.ws.WS
-import play.api.libs.ws.Response
-import org.apache.commons.codec.binary.Base64
-import org.apache.commons.lang.StringUtils
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
-import java.text.SimpleDateFormat
 import java.util.Date
-import scala.xml.Elem
-import fly.play.libraryUtils.PlayConfiguration
-import fly.play.aws.auth.AwsCredentials
+import scala.collection.JavaConversions.asScalaBuffer
+import scala.collection.JavaConversions.mapAsScalaMap
+import scala.concurrent.Future
 import fly.play.aws.Aws
-import play.api.libs.ws.Response
-import fly.play.aws.xml.AwsResponse
+import fly.play.aws.auth.AwsCredentials
 import fly.play.aws.xml.AwsError
+import fly.play.aws.xml.AwsResponse
 import play.api.http.ContentTypeOf
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
+import play.api.libs.concurrent.Promise
+import play.api.libs.ws.Response
 import scala.collection.JavaConversions
 
 /**
@@ -51,7 +43,7 @@ object S3 {
    *
    * @see Bucket.add
    */
-  def put(bucketName: String, bucketFile: BucketFile)(implicit credentials: AwsCredentials): Promise[Response] = {
+  def put(bucketName: String, bucketFile: BucketFile)(implicit credentials: AwsCredentials): Future[Response] = {
     val acl = bucketFile.acl getOrElse PUBLIC_READ
 
     implicit val fileContentType = ContentTypeOf[Array[Byte]](Some(bucketFile.contentType))
@@ -77,7 +69,7 @@ object S3 {
    * @see Bucket.get
    * @see Bucket.list
    */
-  def get(bucketName: String, path: Option[String], prefix: Option[String], delimiter: Option[String])(implicit credentials: AwsCredentials): Promise[Response] =
+  def get(bucketName: String, path: Option[String], prefix: Option[String], delimiter: Option[String])(implicit credentials: AwsCredentials): Future[Response] =
     Aws
       .withSigner(S3Signer(credentials))
       .url(httpUrl(bucketName, path.getOrElse("")))
@@ -94,7 +86,7 @@ object S3 {
    *
    * @see Bucket.remove
    */
-  def delete(bucketName: String, path: String)(implicit credentials: AwsCredentials): Promise[Response] =
+  def delete(bucketName: String, path: String)(implicit credentials: AwsCredentials): Future[Response] =
     Aws
       .withSigner(S3Signer(credentials))
       .url(httpUrl(bucketName, path))
@@ -134,7 +126,7 @@ object S3 {
    *
    * @see Bucket.rename
    */
-  def putCopy(sourceBucketName: String, sourcePath: String, destinationBucketName: String, destinationPath: String, acl: ACL)(implicit credentials: AwsCredentials): Promise[Response] = {
+  def putCopy(sourceBucketName: String, sourcePath: String, destinationBucketName: String, destinationPath: String, acl: ACL)(implicit credentials: AwsCredentials): Future[Response] = {
     val source = "/" + sourceBucketName + "/" + sourcePath
 
     Aws
@@ -174,7 +166,7 @@ case class Bucket(
    *
    * @param itemName	The name of the item you want to retrieve
    */
-  def get(itemName: String): Promise[Either[AwsError, BucketFile]] =
+  def get(itemName: String): Future[Either[AwsError, BucketFile]] =
     S3.get(name, Some(itemName), None, None) map AwsResponse { (status, response) =>
       //implicits
       import JavaConversions.mapAsScalaMap
@@ -196,13 +188,13 @@ case class Bucket(
   /**
    * Lists the contents of the bucket
    */
-  def list: Promise[Either[AwsError, Iterable[BucketItem]]] =
+  def list: Future[Either[AwsError, Iterable[BucketItem]]] =
     S3.get(name, None, None, delimiter) map listResponse
 
   /**
    * Lists the contents of a 'directory' in the bucket
    */
-  def list(prefix: String): Promise[Either[AwsError, Iterable[BucketItem]]] =
+  def list(prefix: String): Future[Either[AwsError, Iterable[BucketItem]]] =
     S3.get(name, None, Some(prefix), delimiter) map listResponse
 
   /**
@@ -214,7 +206,7 @@ case class Bucket(
    *
    * @param bucketFile	A representation of the file
    */
-  def add(bucketFile: BucketFile): Promise[Either[AwsError, Success]] =
+  def add(bucketFile: BucketFile): Future[Either[AwsError, Success]] =
     S3.put(name, bucketFile) map successResponse
 
   /**
@@ -226,7 +218,7 @@ case class Bucket(
    *
    * @param itemName	The name of the file that needs to be removed
    */
-  def remove(itemName: String): Promise[Either[AwsError, Success]] =
+  def remove(itemName: String): Future[Either[AwsError, Success]] =
     S3.delete(name, itemName) map successResponse
 
   /**
@@ -246,7 +238,7 @@ case class Bucket(
    * @param destinationItemName		The new name of the item
    * @param acl						The ACL for the new item, default is PUBLIC_READ
    */
-  def rename(sourceItemName: String, destinationItemName: String, acl: ACL = PUBLIC_READ): Promise[Either[AwsError, Success]] =
+  def rename(sourceItemName: String, destinationItemName: String, acl: ACL = PUBLIC_READ): Future[Either[AwsError, Success]] =
     (S3.putCopy(name, sourceItemName, name, destinationItemName, acl) map successResponse).flatMap { response =>
       response.fold(
         error => Promise.pure(response),
@@ -257,8 +249,8 @@ case class Bucket(
     AwsResponse { (status, response) =>
       val xml = response.xml
 
-      /* files */ (xml \ "Contents").map(n => BucketItem(n \ "Key" text, false)) ++
-        /* folders */ (xml \ "CommonPrefixes").map(n => BucketItem(n \ "Prefix" text, true))
+      /* files */ (xml \ "Contents").map(n => BucketItem((n \ "Key").text, false)) ++
+        /* folders */ (xml \ "CommonPrefixes").map(n => BucketItem((n \ "Prefix").text, true))
     } _
 
   private def successResponse = AwsResponse { (status, response) => Success() } _

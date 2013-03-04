@@ -28,7 +28,7 @@ case class S3Signer(credentials: AwsCredentials) extends Signer with SignerUtils
   override def hash(bytes: Array[Byte]): Array[Byte] = {
     val md = MessageDigest getInstance "MD5"
     md update bytes
-    md digest
+    md.digest
   }
 
   private[s3] def addAuthorizationHeaders(request: WS.WSRequestHolder, method: String, body: Option[Array[Byte]], contentType: Option[String]): WS.WSRequestHolder = {

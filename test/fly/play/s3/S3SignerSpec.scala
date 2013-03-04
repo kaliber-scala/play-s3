@@ -1,8 +1,6 @@
 package fly.play.s3
 
-import org.specs2.mutable._
-import java.util.Date
-import play.api.http.Writeable
+import org.specs2.mutable.Specification
 import fly.play.aws.auth.AwsCredentials
 
 object Aws3SignerSpec extends Specification {
