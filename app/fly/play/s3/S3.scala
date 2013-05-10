@@ -18,6 +18,7 @@ import scala.collection.JavaConversions
  * Amazon Simple Storage Service
  */
 object S3 {
+  val config = play.api.Play.current.configuration
 
   /**
    * Utility method to create a bucket.
@@ -33,7 +34,7 @@ object S3 {
   def apply(bucketName: String, delimiter: String)(implicit credentials: AwsCredentials): Bucket = Bucket(bucketName, Some(delimiter))
 
   private def httpUrl(bucketName: String, path: String) =
-    "http://" + bucketName + ".s3.amazonaws.com/" + path
+    { if (config.getBoolean("aws.use_https").getOrElse(false)) "https://" else "http://" } + bucketName + "." + config.getString("aws.hostname").getOrElse("s3.amazonaws.com") + "/" + path
 
   /**
    * Lowlevel method to call put on a bucket in order to store a file
