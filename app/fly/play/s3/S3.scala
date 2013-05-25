@@ -34,7 +34,13 @@ object S3 {
   def apply(bucketName: String, delimiter: String)(implicit credentials: AwsCredentials): Bucket = Bucket(bucketName, Some(delimiter))
 
   private def httpUrl(bucketName: String, path: String) =
-    { if (config.getBoolean("aws.use_https").getOrElse(false)) "https://" else "http://" } + bucketName + "." + config.getString("aws.hostname").getOrElse("s3.amazonaws.com") + "/" + path
+    {
+      val protocol = "http" + { if ( config getBoolean "aws.use_https" getOrElse false) "s" else "" }
+      val hostname = config getString "aws.hostname" getOrElse "s3.amazonaws.com"
+      // now build all url
+      protocol + "://" + bucketName + "." + hostname + "/" + path
+    }
+
 
   /**
    * Lowlevel method to call put on a bucket in order to store a file
@@ -179,11 +185,11 @@ case class Bucket(
           if (value.size > 0)
         } yield key -> value.head
 
-      BucketFile(itemName, 
-          headers("Content-Type"), 
-          response.ahcResponse.getResponseBodyAsBytes, 
-          None, 
-          Some(headers))
+      BucketFile(itemName,
+        headers("Content-Type"),
+        response.ahcResponse.getResponseBodyAsBytes,
+        None,
+        Some(headers))
     }
 
   /**
