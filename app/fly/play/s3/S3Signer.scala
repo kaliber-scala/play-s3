@@ -50,7 +50,6 @@ case class S3Signer(credentials: AwsCredentials) extends Signer with SignerUtils
     }
 
     //we need to extract the bucket name from the host and use it in the resource path
-    // "(.*?)" + """.""" + (s replace(".","""\."""))
     val BucketName = ("(.*?)" + ( "." + S3.getHostname ).replace(".","""\.""")).r
     val bucketName = uri.getHost match {
       case BucketName(name) => name
