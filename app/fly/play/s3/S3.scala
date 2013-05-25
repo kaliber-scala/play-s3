@@ -35,12 +35,18 @@ object S3 {
 
   private def httpUrl(bucketName: String, path: String) =
     {
-      val protocol = "http" + { if ( config getBoolean "aws.use_https" getOrElse false) "s" else "" }
-      val hostname = config getString "aws.hostname" getOrElse "s3.amazonaws.com"
+      val protocol = "http" + { if (config getBoolean "aws.use_https" getOrElse false) "s" else "" }
       // now build all url
-      protocol + "://" + bucketName + "." + hostname + "/" + path
+      protocol + "://" + bucketName + "." + getHostname + "/" + path
     }
 
+  /**
+   * Utility method to retrieve hostname
+   *
+   */
+  def getHostname = {
+    config getString "aws.hostname" getOrElse "s3.amazonaws.com"
+  }
 
   /**
    * Lowlevel method to call put on a bucket in order to store a file
