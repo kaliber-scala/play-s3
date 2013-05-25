@@ -5,7 +5,7 @@ import play.Project._
 object ApplicationBuild extends Build {
 
   val appName = "api-s3"
-  val appVersion = "2.6.2"
+  val appVersion = "2.6.2-SNAPSHOT"
 
   val appDependencies = Seq(
     "nl.rhinofly" %% "api-aws-utils" % "2.3.1")
