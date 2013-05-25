@@ -34,6 +34,13 @@ aws.accessKeyId=AmazonAccessKeyId
 aws.secretKey=AmazonSecretKey
 ```
 
+if you are using another S3 implementation (like riakCS), you can customize the domain name and https usage with these values :
+
+``` scala
+aws.hostname="your.domaine.name"
+aws.use_https=true
+```
+
 Usage
 -----
 

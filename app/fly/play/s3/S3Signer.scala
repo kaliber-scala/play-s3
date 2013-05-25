@@ -10,8 +10,10 @@ import javax.crypto.spec.SecretKeySpec
 import java.security.MessageDigest
 import fly.play.aws.auth.{ AwsCredentials, Signer, SignerUtils }
 
-case class S3Signer(credentials: AwsCredentials) extends Signer with SignerUtils {
+case class S3Signer(credentials: AwsCredentials, s3o:S3 = S3.defaultS3) extends Signer with SignerUtils {
   private val AwsCredentials(accessKeyId, secretKey, sessionToken, expirationSeconds) = credentials
+  
+  val config = play.api.Play.current.configuration
 
   def sign(request: WS.WSRequestHolder, method: String): WS.WSRequestHolder =
     addAuthorizationHeaders(request, method, None, None)
@@ -48,7 +50,7 @@ case class S3Signer(credentials: AwsCredentials) extends Signer with SignerUtils
     }
 
     //we need to extract the bucket name from the host and use it in the resource path
-    val BucketName = """(.*?)\.s3\.amazonaws\.com""".r
+    val BucketName = ("(.*?)" + ( "." + s3o.hostname ).replace(".","""\.""")).r
     val bucketName = uri.getHost match {
       case BucketName(name) => name
       case x => throw new Exception("Could not extract the bucket name from " + x)

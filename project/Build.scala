@@ -5,7 +5,7 @@ import play.Project._
 object ApplicationBuild extends Build {
 
   val appName = "api-s3"
-  val appVersion = "2.6.1"
+  val appVersion = "2.6.2-SNAPSHOT"
 
   val appDependencies = Seq(
     "nl.rhinofly" %% "api-aws-utils" % "2.3.1")
@@ -18,7 +18,9 @@ object ApplicationBuild extends Build {
   val main = play.Project(appName, appVersion, appDependencies).settings(
     organization := "nl.rhinofly",
     resolvers += rhinoflyRepo("RELEASE").get,
-    publishTo <<= version(rhinoflyRepo),
+    // just for tests
+     publishTo := Some(Resolver.file("file",  new File(Path.userHome.absolutePath+"/.m2/repository"))),
+//    publishTo <<= version(rhinoflyRepo),
     credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"))
 
 }
