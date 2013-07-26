@@ -34,8 +34,8 @@ case class Bucket(
    *
    * @param itemName	The name of the item you want to retrieve
    */
-  def get(itemName: String): Future[Either[AwsError, BucketFile]] =
-    s3.get(name, Some(itemName), None, None) map AwsResponse { (status, response) =>
+  def get(itemName: String): Future[BucketFile] =
+    s3.get(name, Some(itemName), None, None) map S3Response { (status, response) =>
       //implicits
       import JavaConversions.mapAsScalaMap
       import JavaConversions.asScalaBuffer
@@ -56,13 +56,13 @@ case class Bucket(
   /**
    * Lists the contents of the bucket
    */
-  def list: Future[Either[AwsError, Iterable[BucketItem]]] =
+  def list: Future[Iterable[BucketItem]] =
     s3.get(name, None, None, delimiter) map listResponse
 
   /**
    * Lists the contents of a 'directory' in the bucket
    */
-  def list(prefix: String): Future[Either[AwsError, Iterable[BucketItem]]] =
+  def list(prefix: String): Future[Iterable[BucketItem]] =
     s3.get(name, None, Some(prefix), delimiter) map listResponse
 
   /**
@@ -74,8 +74,8 @@ case class Bucket(
    *
    * @param bucketFile	A representation of the file
    */
-  def add(bucketFile: BucketFile): Future[Either[AwsError, Success]] =
-    s3.put(name, bucketFile) map successResponse
+  def add(bucketFile: BucketFile): Future[Unit] =
+    s3.put(name, bucketFile) map unitResponse
 
   /**
    * @see remove
@@ -86,8 +86,8 @@ case class Bucket(
    *
    * @param itemName	The name of the file that needs to be removed
    */
-  def remove(itemName: String): Future[Either[AwsError, Success]] =
-    s3.delete(name, itemName) map successResponse
+  def remove(itemName: String): Future[Unit] =
+    s3.delete(name, itemName) map unitResponse
 
   /**
    * Creates a new instance of the Bucket with another delimiter
@@ -106,22 +106,22 @@ case class Bucket(
    * @param destinationItemName		The new name of the item
    * @param acl						The ACL for the new item, default is PUBLIC_READ
    */
-  def rename(sourceItemName: String, destinationItemName: String, acl: ACL = PUBLIC_READ): Future[Either[AwsError, Success]] =
-    (s3.putCopy(name, sourceItemName, name, destinationItemName, acl) map successResponse).flatMap { response =>
-      response.fold(
-        error => Future(response),
-        success => remove(sourceItemName))
+  def rename(sourceItemName: String, destinationItemName: String, acl: ACL = PUBLIC_READ): Future[Unit] = {
+    val copyResult = s3.putCopy(name, sourceItemName, name, destinationItemName, acl) map unitResponse
+    copyResult.flatMap { response =>
+      remove(sourceItemName)
     }
+  }
 
   private def listResponse =
-    AwsResponse { (status, response) =>
+    S3Response { (status, response) =>
       val xml = response.xml
 
       /* files */ (xml \ "Contents").map(n => BucketItem((n \ "Key").text, false)) ++
         /* folders */ (xml \ "CommonPrefixes").map(n => BucketItem((n \ "Prefix").text, true))
     } _
 
-  private def successResponse = AwsResponse { (status, response) => Success() } _
+  private def unitResponse = S3Response { (status, response) => } _
 }
 
 /**

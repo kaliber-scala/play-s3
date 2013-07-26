@@ -16,8 +16,11 @@ import org.specs2.specification.Example
 import play.api.test.FakeApplication
 import play.api.test.Helpers._
 import fly.play.aws.auth.AwsCredentials
+import scala.util.Success
+import scala.util.Failure
+import scala.concurrent.duration.Duration
 
-class S3Spec extends Specification with DeactivatedTimeConversions {
+class S3Spec extends Specification {
 
   sequential
 
@@ -94,102 +97,97 @@ class S3Spec extends Specification with DeactivatedTimeConversions {
     }
 
     "give an error if we request an element that does not exist" inApp {
+
       val result = testBucket.get("nonExistingElement")
-      val value = Await.result(result, 10 seconds)
-      value.fold(
-        _ match {
-          case AwsError(404, "NoSuchKey", _, _) => success
-          case x => failure("Unexpected error: " + x)
-        },
-        { x => failure("Error was expected, no error received: " + x) })
+      val value = Await.ready(result, Duration.Inf).value.get
+
+      value match {
+        case Failure(S3Exception(404, "NoSuchKey", _, _)) => success
+        case Failure(err) => failure("Unexpected failure: " + err)
+        case Success(x) => failure("Error was expected, no error received: " + x)
+      }
     }
 
     "be able to add a file" inApp {
+
       val result = testBucket + BucketFile("README.txt", "text/plain", """
 		        This is a bucket used for testing the S3 module of play
 		        """.getBytes)
-      val value = Await.result(result, 10 seconds)
-      value.fold({ e => failure(e.toString) }, { s => success })
+
+      Await.result(result, Duration.Inf) must not(throwA[Throwable])
     }
 
     "with the correct mime type" inApp {
+
       val result = s3WithCredentials.get(testBucket.name, Some("README.txt"), None, None)
-      val value = Await.result(result, 10 seconds)
+      val value = Await.result(result, Duration.Inf)
 
       value.header(HeaderNames.CONTENT_TYPE) must_== Some("text/plain")
     }
 
     "be able to check if it exists" inApp {
-      val result = testBucket get "README.txt"
-      val value = Await.result(result, 10 seconds)
-      value.fold(
-        { e => failure(e.toString) },
-        { f =>
-          f match {
-            case BucketFile("README.txt", _, _, _, _) => success
-            case f => failure("Wrong file returned: " + f)
-          }
-        })
 
+      val result = testBucket get "README.txt"
+      val value = Await.result(result, Duration.Inf)
+
+      value match {
+        case BucketFile("README.txt", _, _, _, _) => success
+        case f => failure("Wrong file returned: " + f)
+      }
     }
 
     "be able add a file with a prefix" inApp {
+
       val result = testBucket + BucketFile("testPrefix/README.txt", "text/plain", """
 		        This is a bucket used for testing the S3 module of play
 		        """.getBytes)
-      val value = Await.result(result, 10 seconds)
-      value.fold({ e => failure(e.toString) }, { s => success })
+
+      Await.result(result, Duration.Inf) must not(throwA[Throwable])
     }
 
     "list should be iterable" inApp {
+
       testBucket.list must beAnInstanceOf[Future[Iterable[BucketItem]]]
     }
 
     "list should have a size of 2" inApp {
+
       val result = testBucket.list
-      val value = Await.result(result, 10 seconds)
-      value.fold(
-        { e => failure(e.toString) },
-        { i => i.size must_== 2 })
+      val value = Await.result(result, Duration.Inf)
+
+      value.size === 2
     }
 
     "list should have the correct contents" inApp {
       val result = testBucket.list
-      val value = Await.result(result, 10 seconds)
-      value.fold(
-        { e => failure(e.toString) },
-        { i =>
-          val seq = i.toSeq
-          seq(0) match {
-            case BucketItem("README.txt", false) => success
-            case f => failure("Wrong file returned: " + f)
-          }
-          seq(1) match {
-            case BucketItem("testPrefix/", true) => success
-            case f => failure("Wrong file returned: " + f)
-          }
+      val value = Await.result(result, Duration.Inf)
 
-        })
+      val seq = value.toSeq
+      seq(0) match {
+        case BucketItem("README.txt", false) => success
+        case f => failure("Wrong file returned: " + f)
+      }
+      seq(1) match {
+        case BucketItem("testPrefix/", true) => success
+        case f => failure("Wrong file returned: " + f)
+      }
     }
 
     "list with prefix should return the correct contents" inApp {
-      val result = testBucket.list("testPrefix/")
-      val value = Await.result(result, 10 seconds)
-      value.fold(
-        { e => failure(e.toString) },
-        { i =>
-          i.toSeq(0) match {
-            case BucketItem("testPrefix/README.txt", false) => success
-            case f => failure("Wrong file returned: " + f)
-          }
 
-        })
+      val result = testBucket.list("testPrefix/")
+      val value = Await.result(result, Duration.Inf)
+      value.toSeq(0) match {
+        case BucketItem("testPrefix/README.txt", false) => success
+        case f => failure("Wrong file returned: " + f)
+      }
     }
 
     "be able to delete a file" inApp {
+      
       val result = testBucket - "testPrefix/README.txt"
-      val value = Await.result(result, 10 seconds)
-      value.fold({ e => failure(e.toString) }, { s => success })
+      
+      Await.result(result, Duration.Inf) must not(throwA[Throwable])
     }
 
     var url = ""
@@ -242,7 +240,7 @@ class S3Spec extends Specification with DeactivatedTimeConversions {
           }
         })
     }
-    
+
     "be able to delete the file with custom headers" inApp {
       val result = testBucket remove "headerTest.txt"
       val value = Await.result(result, 10 seconds)

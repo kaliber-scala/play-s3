@@ -180,5 +180,3 @@ class S3(val https:Boolean, val host:String)(implicit val credentials: AwsCreden
 
 }
 
-case class Success()
-
