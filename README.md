@@ -34,11 +34,14 @@ aws.accessKeyId=AmazonAccessKeyId
 aws.secretKey=AmazonSecretKey
 ```
 
-if you are using another S3 implementation (like riakCS), you can customize the domain name and https usage with these values :
+If you are using another S3 implementation (like riakCS), you can customize the domain name and 
+https usage with these values:
 
 ``` scala
-aws.hostname="your.domaine.name"
-aws.use_https=true
+#default is s3.amazonaws.com
+s3.host="your.domaine.name"
+#default is false
+s3.https=true
 ```
 
 Usage
@@ -148,4 +151,5 @@ result.map {
 }
 ```
 
-More examples can be found in the `S3Spec` in the `test` folder
+More examples can be found in the `S3Spec` in the `test` folder. In order to run the tests you need 
+an `application.conf` file in the `test/conf` folder containing a valid `aws.accessKeyId` and `aws.secretKey`.

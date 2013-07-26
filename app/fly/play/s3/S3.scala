@@ -18,48 +18,67 @@ import scala.collection.JavaConversions
  * Amazon Simple Storage Service
  */
 object S3 {
-  val config = play.api.Play.current.configuration
-  val use_https = config getBoolean "aws.use_https" getOrElse false
-  def getHostname = {
-    config getString "aws.hostname" getOrElse "s3.amazonaws.com"
-  }
-  lazy val defaultS3 = new S3(use_https, getHostname, implicitly[AwsCredentials])
+  
+  def config = play.api.Play.current.configuration
+  
+  def https = config getBoolean "s3.https" getOrElse false
+  def host = config getString "s3.host" getOrElse "s3.amazonaws.com" 
+  
+  def fromConfig(implicit credentials:AwsCredentials) = 
+    new S3(https, host)
+  
+  /**
+   * Utility method to create a bucket.
+   *
+   * @see Bucket
+   */
+  def apply(bucketName: String)(implicit credentials: AwsCredentials): Bucket = 
+    fromConfig.getBucket(bucketName)
+    
+  /**
+   * Utility method to create a bucket.
+   *
+   * @see Bucket
+   */
+  def apply(bucketName: String, delimiter: String)(implicit credentials: AwsCredentials): Bucket =
+    fromConfig.getBucket(bucketName, delimiter)
 
+    
   /**
-   * Utility method to create a bucket.
-   *
-   * @see Bucket
+   * Utility method to create an url
    */
-  def apply(bucketName: String)(implicit credentials: AwsCredentials): Bucket = defaultS3.apply(bucketName)
-  /**
-   * Utility method to create a bucket.
-   *
-   * @see Bucket
-   */
-  def apply(bucketName: String, delimiter: String)(implicit credentials: AwsCredentials): Bucket = defaultS3.apply(bucketName, delimiter)
+  def url(bucketName: String, path: String, expires: Long)(implicit credentials: AwsCredentials) =
+  	fromConfig.url(bucketName, path, expires)
   
 }
 
-class S3(use_https: Boolean, val hostname: String, val creds:AwsCredentials) {
+class S3(val https:Boolean, val host:String)(implicit val credentials: AwsCredentials) {
+
+  lazy val s3Signer = S3Signer(credentials, host)
+
+  lazy val awsWithSigner = Aws withSigner s3Signer
+  
+  /**
+   * Utility method to create a bucket.
+   *
+   * @see Bucket
+   */
+  def getBucket(bucketName: String): Bucket = Bucket(bucketName, s3 = this)
 
   /**
    * Utility method to create a bucket.
    *
    * @see Bucket
    */
-  def apply(bucketName: String)(implicit credentials: AwsCredentials): Bucket = Bucket(bucketName, s3=this)(creds)
-  /**
-   * Utility method to create a bucket.
-   *
-   * @see Bucket
-   */
-  def apply(bucketName: String, delimiter: String)(implicit credentials: AwsCredentials): Bucket = Bucket(bucketName, Some(delimiter), this)(creds)
+  def getBucket(bucketName: String, delimiter: String): Bucket = 
+    Bucket(bucketName, Some(delimiter), this)
 
-  private def httpUrl(bucketName: String, path: String) =
-    {
-      val protocol = "http" + { if (use_https) "s" else "" }
+  private def httpUrl(bucketName: String, path: String) = {
+    
+      var protocol = "http"
+      if (https) protocol += "s" 
       // now build all url
-      protocol + "://" + bucketName + "." + hostname + "/" + path
+      protocol + "://" + bucketName + "." + host + "/" + path
     }
 
   /**
@@ -70,15 +89,14 @@ class S3(use_https: Boolean, val hostname: String, val creds:AwsCredentials) {
    *
    * @see Bucket.add
    */
-  def put(bucketName: String, bucketFile: BucketFile)(implicit credentials: AwsCredentials): Future[Response] = {
+  def put(bucketName: String, bucketFile: BucketFile): Future[Response] = {
     val acl = bucketFile.acl getOrElse PUBLIC_READ
 
     implicit val fileContentType = ContentTypeOf[Array[Byte]](Some(bucketFile.contentType))
 
     val headers = (bucketFile.headers getOrElse Map.empty).toList
 
-    Aws
-      .withSigner(S3Signer(credentials))
+    awsWithSigner
       .url(httpUrl(bucketName, bucketFile.name))
       .withHeaders("X-Amz-acl" -> acl.value :: headers: _*)
       .put(bucketFile.content)
@@ -96,9 +114,8 @@ class S3(use_https: Boolean, val hostname: String, val creds:AwsCredentials) {
    * @see Bucket.get
    * @see Bucket.list
    */
-  def get(bucketName: String, path: Option[String], prefix: Option[String], delimiter: Option[String])(implicit credentials: AwsCredentials): Future[Response] =
-    Aws
-      .withSigner(S3Signer(credentials))
+  def get(bucketName: String, path: Option[String], prefix: Option[String], delimiter: Option[String]): Future[Response] =
+    awsWithSigner
       .url(httpUrl(bucketName, path.getOrElse("")))
       .withQueryString(
         (prefix.map("prefix" -> _).toList :::
@@ -113,9 +130,8 @@ class S3(use_https: Boolean, val hostname: String, val creds:AwsCredentials) {
    *
    * @see Bucket.remove
    */
-  def delete(bucketName: String, path: String)(implicit credentials: AwsCredentials): Future[Response] =
-    Aws
-      .withSigner(S3Signer(credentials))
+  def delete(bucketName: String, path: String): Future[Response] =
+    awsWithSigner
       .url(httpUrl(bucketName, path))
       .delete
 
@@ -128,11 +144,10 @@ class S3(use_https: Boolean, val hostname: String, val creds:AwsCredentials) {
    *
    * @see Bucket.url
    */
-  def url(bucketName: String, path: String, expires: Long)(implicit credentials: AwsCredentials): String = {
+  def url(bucketName: String, path: String, expires: Long): String = {
     val expireString = expires.toString
 
     val cannonicalRequest = "GET\n\n\n" + expireString + "\n/" + bucketName + "/" + path
-    val s3Signer = S3Signer(credentials)
     val signature = s3Signer.createSignature(cannonicalRequest)
 
     httpUrl(bucketName, path) +
@@ -153,11 +168,10 @@ class S3(use_https: Boolean, val hostname: String, val creds:AwsCredentials) {
    *
    * @see Bucket.rename
    */
-  def putCopy(sourceBucketName: String, sourcePath: String, destinationBucketName: String, destinationPath: String, acl: ACL)(implicit credentials: AwsCredentials): Future[Response] = {
+  def putCopy(sourceBucketName: String, sourcePath: String, destinationBucketName: String, destinationPath: String, acl: ACL): Future[Response] = {
     val source = "/" + sourceBucketName + "/" + sourcePath
 
-    Aws
-      .withSigner(S3Signer(credentials))
+    awsWithSigner
       .url(httpUrl(destinationBucketName, destinationPath))
       .withHeaders("X-Amz-acl" -> acl.value)
       .withHeaders("X-Amz-copy-source" -> source)
@@ -168,135 +182,3 @@ class S3(use_https: Boolean, val hostname: String, val creds:AwsCredentials) {
 
 case class Success()
 
-/**
- * Representation of a bucket
- *
- * @param bucketName	The name of the bucket needed to create a Bucket representation
- * @param delimiter		A delimiter to use for this Bucket instance, default is a / (slash)
- *
- */
-case class Bucket(
-  name: String,
-  delimiter: Option[String] = Some("/"),
-  s3:S3 = S3.defaultS3)(implicit val credentials: AwsCredentials) {
-
-  /**
-   * Creates an authenticated url for an item with the given name
-   *
-   * @param itemName	The item for which the url should be created
-   * @param expires		The expiration in seconds from now
-   */
-  def url(itemName: String, expires: Long): String =
-    s3.url(name, itemName, ((new Date).getTime / 1000) + expires)(credentials)
-
-  /**
-   * Retrieves a single item with the given name
-   *
-   * @param itemName	The name of the item you want to retrieve
-   */
-  def get(itemName: String): Future[Either[AwsError, BucketFile]] =
-    s3.get(name, Some(itemName), None, None)(credentials) map AwsResponse { (status, response) =>
-      //implicits
-      import JavaConversions.mapAsScalaMap
-      import JavaConversions.asScalaBuffer
-
-      val headers =
-        for {
-          (key, value) <- response.ahcResponse.getHeaders.toMap
-          if (value.size > 0)
-        } yield key -> value.head
-
-      BucketFile(itemName,
-        headers("Content-Type"),
-        response.ahcResponse.getResponseBodyAsBytes,
-        None,
-        Some(headers))
-    }
-
-  /**
-   * Lists the contents of the bucket
-   */
-  def list: Future[Either[AwsError, Iterable[BucketItem]]] =
-    s3.get(name, None, None, delimiter)(credentials) map listResponse
-
-  /**
-   * Lists the contents of a 'directory' in the bucket
-   */
-  def list(prefix: String): Future[Either[AwsError, Iterable[BucketItem]]] =
-    s3.get(name, None, Some(prefix), delimiter)(credentials) map listResponse
-
-  /**
-   * @see add
-   */
-  def + = add _
-  /**
-   * Adds a file to this bucket
-   *
-   * @param bucketFile	A representation of the file
-   */
-  def add(bucketFile: BucketFile): Future[Either[AwsError, Success]] =
-    s3.put(name, bucketFile)(credentials) map successResponse
-
-  /**
-   * @see remove
-   */
-  def - = remove _
-  /**
-   * Removes a file from this bucket
-   *
-   * @param itemName	The name of the file that needs to be removed
-   */
-  def remove(itemName: String): Future[Either[AwsError, Success]] =
-    s3.delete(name, itemName)(credentials) map successResponse
-
-  /**
-   * Creates a new instance of the Bucket with another delimiter
-   */
-  def withDelimiter(delimiter: String): Bucket = copy(delimiter = Some(delimiter))
-  /**
-   * Creates a new instance of the Bucket with another delimiter
-   */
-  def withDelimiter(delimiter: Option[String]): Bucket = copy(delimiter = delimiter)
-
-  /**
-   * Allows you to rename a file within this bucket. It will actually do a copy and
-   * a remove.
-   *
-   * @param sourceItemName			The old name of the item
-   * @param destinationItemName		The new name of the item
-   * @param acl						The ACL for the new item, default is PUBLIC_READ
-   */
-  def rename(sourceItemName: String, destinationItemName: String, acl: ACL = PUBLIC_READ): Future[Either[AwsError, Success]] =
-    (s3.putCopy(name, sourceItemName, name, destinationItemName, acl)(credentials) map successResponse).flatMap { response =>
-      response.fold(
-        error => Promise.pure(response),
-        success => remove(sourceItemName))
-    }
-
-  private def listResponse =
-    AwsResponse { (status, response) =>
-      val xml = response.xml
-
-      /* files */ (xml \ "Contents").map(n => BucketItem((n \ "Key").text, false)) ++
-        /* folders */ (xml \ "CommonPrefixes").map(n => BucketItem((n \ "Prefix").text, true))
-    } _
-
-  private def successResponse = AwsResponse { (status, response) => Success() } _
-}
-
-/**
- * Representation of an element in a bucket as the result of a call to the list method
- */
-case class BucketItem(name: String, isVirtual: Boolean)
-/**
- * Representation of a file, used in get and add methods of the bucket
- */
-case class BucketFile(name: String, contentType: String, content: Array[Byte], acl: Option[ACL] = None, headers: Option[Map[String, String]] = None)
-
-case object PUBLIC_READ extends ACL("public-read")
-case object PUBLIC_READ_WRITE extends ACL("public-read-write")
-case object AUTHENTICATED_READ extends ACL("authenticated-read")
-case object BUCKET_OWNER_READ extends ACL("bucket-owner-read")
-case object BUCKET_OWNER_FULL_CONTROL extends ACL("bucket-owner-full-control")
-
-sealed abstract class ACL(val value: String)

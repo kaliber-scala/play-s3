@@ -10,10 +10,8 @@ import javax.crypto.spec.SecretKeySpec
 import java.security.MessageDigest
 import fly.play.aws.auth.{ AwsCredentials, Signer, SignerUtils }
 
-case class S3Signer(credentials: AwsCredentials, s3o:S3 = S3.defaultS3) extends Signer with SignerUtils {
+case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer with SignerUtils {
   private val AwsCredentials(accessKeyId, secretKey, sessionToken, expirationSeconds) = credentials
-  
-  val config = play.api.Play.current.configuration
 
   def sign(request: WS.WSRequestHolder, method: String): WS.WSRequestHolder =
     addAuthorizationHeaders(request, method, None, None)
@@ -50,11 +48,13 @@ case class S3Signer(credentials: AwsCredentials, s3o:S3 = S3.defaultS3) extends 
     }
 
     //we need to extract the bucket name from the host and use it in the resource path
-    val BucketName = ("(.*?)" + ( "." + s3o.hostname ).replace(".","""\.""")).r
-    val bucketName = uri.getHost match {
-      case BucketName(name) => name
-      case x => throw new Exception("Could not extract the bucket name from " + x)
-    }
+    val escapedS3Host = s3Host.replace(".", raw"\.")
+    val BucketNameRegex = s"(.*?)\\.$escapedS3Host".r
+    val bucketName =
+      uri.getHost match {
+        case BucketNameRegex(name) => name
+        case x => throw new Exception("Could not extract the bucket name from " + x)
+      }
 
     val resourcePath = "/" + bucketName + path.getOrElse("")
 

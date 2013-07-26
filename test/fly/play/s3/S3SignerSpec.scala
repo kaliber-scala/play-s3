@@ -3,13 +3,12 @@ package fly.play.s3
 import org.specs2.mutable.Specification
 import fly.play.aws.auth.AwsCredentials
 
-object Aws3SignerSpec extends Specification {
+object S3SignerSpec extends Specification {
 
   val fakeCredentials = AwsCredentials("fakeKeyId", "fakeSecret", Some("securityToken"))
+  def signer = S3Signer(fakeCredentials, "noHost")
 
-  "Aws3Signer" should {
-
-    val signer = S3Signer(fakeCredentials)
+  "S3Signer" should {
 
     "add the correct headers" in {
 

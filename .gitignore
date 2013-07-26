@@ -10,5 +10,4 @@ dist
 /.project
 test/conf
 /.cache
-
 .target
