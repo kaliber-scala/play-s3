@@ -39,7 +39,7 @@ https usage with these values:
 
 ``` scala
 #default is s3.amazonaws.com
-s3.host="your.domaine.name"
+s3.host="your.domain.name"
 #default is false
 s3.https=true
 ```
