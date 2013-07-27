@@ -69,15 +69,14 @@ val result = bucket + BucketFile(fileName, mimeType, byteArray, acl, headers)
 //or
 val result = bucket add BucketFile(fileName, mimeType, byteArray, acl, headers)
 
-result.map { 
-	case Left(error) => throw new Exception("Error: " + x)
-	case Right(success) => Logger.info("Saved the file")
-}
-//or
-val value = Await.result(result, 10 seconds)
-value.fold(
-      { error => throw new Exception("Error: " + error) },
-      { success => Logger.info("Saved the file") })
+result
+  .map { unit => 
+	Logger.info("Saved the file")
+  }
+  .recover {
+    case S3Exception(status, code, message, originalXml) => Logger.info("Error: " + message)
+  }
+
 ```      
 
 Removing a file:
@@ -87,15 +86,6 @@ val result = bucket - BucketFile(fileName, mimeType, byteArray)
 //or
 val result = bucket remove BucketFile(fileName, mimeType, byteArray)
 
-result.map { 
-	case Left(error) => throw new Exception("Error: " + x)
-	case Right(success) => Logger.info("Removed the file")
-}
-//or
-val value = Await.result(result, 10 seconds)
-value.fold(
-      { error => throw new Exception("Error: " + error) },
-      { success => Logger.info("Removed the file") })
 ``` 
 
 Retrieving a file:
@@ -104,17 +94,11 @@ Retrieving a file:
 val result = bucket get "fileName"
 
 result.map { 
-	case Left(error) => throw new Exception("Error: " + x)
-	case Right(BucketFile(name, contentType, content, acl, headers)) => //...
+	case BucketFile(name, contentType, content, acl, headers) => //...
 }
 //or
-val value = Await.result(result, 10 seconds)
-value.fold(
-      { error => throw new Exception("Error: " + error) },
-      { file => 
-      	val BucketFile(name, contentType, content, acl, headers) = file
-      	//...
-      })
+val file = Await.result(result, 10 seconds)
+val BucketFile(name, contentType, content, acl, headers) = file
 ``` 
 
 Listing the contents of a bucket:
@@ -122,12 +106,8 @@ Listing the contents of a bucket:
 ``` scala
 val result = bucket.list
 
-result.map {
-	case Left(error) => throw new Exception("Error: " + x)
-	case Right(list) => 
-		list.foreach {
-	   		case BucketItem(name, isVirtual) => //...
-		}
+result.foreach {
+  case BucketItem(name, isVirtual) => //...
 }
 
 //or using a prefix
@@ -144,11 +124,6 @@ Renaming a file:
 
 ``` scala
 val result = bucket rename("oldFileName", "newFileName", ACL)
-
-result.map { 
-  case Left(error) => throw new Exception("Error: " + x)
-  case Right(success) => Logger.info("Renamed the file")
-}
 ```
 
 More examples can be found in the `S3Spec` in the `test` folder. In order to run the tests you need 
