@@ -184,67 +184,68 @@ class S3Spec extends Specification {
     }
 
     "be able to delete a file" inApp {
-      
+
       val result = testBucket - "testPrefix/README.txt"
-      
+
       Await.result(result, Duration.Inf) must not(throwA[Throwable])
     }
 
     var url = ""
 
     "be able to add a file with private ACL and create a url for it" inApp {
+
       val fileName = "privateREADME.txt"
       url = testBucket.url(fileName, 86400)
       val result = testBucket + BucketFile(fileName, "text/plain", """
 		        This is a bucket used for testing the S3 module of play
 		        """.getBytes, Some(AUTHENTICATED_READ), None)
-      val value = Await.result(result, 10 seconds)
-      value.fold({ e => failure(e.toString) }, { s => success })
+
+      Await.result(result, Duration.Inf) must not(throwA[Throwable])
     }
 
     "be able to retrieve the private file using the generated url" inApp {
+
       val result = WS.url(url).get
-      val value = Await.result(result, 10 seconds)
+
+      val value = Await.result(result, Duration.Inf)
       value.status must_== 200
     }
 
     "be able to rename a file" inApp {
+
       val result = testBucket rename ("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
-      val value = Await.result(result, 10 seconds)
-      value.fold({ e => failure(e.toString) }, { s => success })
+      Await.result(result, Duration.Inf) must not(throwA[Throwable])
     }
 
     "be able to delete the renamed private file" inApp {
+
       val result = testBucket remove "private2README.txt"
-      val value = Await.result(result, 10 seconds)
-      value.fold({ e => failure(e.toString) }, { s => success })
+      Await.result(result, Duration.Inf) must not(throwA[Throwable])
     }
 
     "be able to add a file with custom headers" inApp {
+
       val result = testBucket + BucketFile("headerTest.txt", "text/plain", """
 		        This file is used for testing custome headers
 		        """.getBytes, None, Some(Map("x-amz-meta-testheader" -> "testHeaderValue")))
-      val value = Await.result(result, 10 seconds)
-      value.fold({ e => failure(e.toString) }, { s => success })
+
+      Await.result(result, Duration.Inf) must not(throwA[Throwable])
     }
 
     "be able to retrieve a file with custom headers" inApp {
+
       val result = testBucket.get("headerTest.txt")
-      val value = Await.result(result, 10 seconds)
-      value.fold(
-        { e => failure(e.toString) },
-        { f =>
-          f match {
-            case BucketFile("headerTest.txt", _, _, _, Some(headers)) => (headers get "x-amz-meta-testheader") must_== Some("testHeaderValue")
-            case f => failure("Wrong file returned: " + f)
-          }
-        })
+      val value = Await.result(result, Duration.Inf)
+      value match {
+        case BucketFile("headerTest.txt", _, _, _, Some(headers)) => (headers get "x-amz-meta-testheader") must_== Some("testHeaderValue")
+        case f => failure("Wrong file returned: " + f)
+      }
     }
 
     "be able to delete the file with custom headers" inApp {
+      
       val result = testBucket remove "headerTest.txt"
-      val value = Await.result(result, 10 seconds)
-      value.fold({ e => failure(e.toString) }, { s => success })
+      Await.result(result, Duration.Inf) must not(throwA[Throwable])
     }
   }
 }
