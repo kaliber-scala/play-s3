@@ -29,8 +29,8 @@ object S3SignerSpec extends Specification {
           "Date" -> Seq("Tue, 22 May 2012 21:13:19 UTC"),
           "X-Amz-Security-Token" -> Seq("securityToken"))
 
-        val cannonicalRequest = signer.createCannonicalRequest("GET", None, None, "Tue, 22 May 2012 21:13:19 UTC", headers, "/bucketName/testFile")
-        cannonicalRequest must_==
+        val canonicalRequest = signer.createCanonicalRequest("GET", None, None, "Tue, 22 May 2012 21:13:19 UTC", headers, "/bucketName/testFile", Map.empty)
+        canonicalRequest must_==
           "GET\n" +
           "\n" +
           "\n" +
@@ -46,14 +46,31 @@ object S3SignerSpec extends Specification {
           "Content-Md5" -> Seq("Md5String"),
           "X-Amz-Security-Token" -> Seq("securityToken"))
 
-        val cannonicalRequest = signer.createCannonicalRequest("POST", Some("Md5String"), Some("text/plain"), "Tue, 22 May 2012 21:13:19 UTC", headers, "/bucketName/testFile")
-        cannonicalRequest must_==
+        val canonicalRequest = signer.createCanonicalRequest("POST", Some("Md5String"), Some("text/plain"), "Tue, 22 May 2012 21:13:19 UTC", headers, "/bucketName/testFile", Map.empty)
+        canonicalRequest must_==
           "POST\n" +
           "Md5String\n" +
           "text/plain\n" +
           "Tue, 22 May 2012 21:13:19 UTC\n" +
           "x-amz-security-token:securityToken\n" +
           "/bucketName/testFile"
+      }
+
+      "for POST request with query string" in {
+         val headers = Map(
+          "Date" -> Seq("Tue, 22 May 2012 21:13:19 UTC"),
+          "Content-Type" -> Seq("text/plain"),
+          "Content-Md5" -> Seq("Md5String"),
+          "X-Amz-Security-Token" -> Seq("securityToken"))
+
+        val canonicalRequest = signer.createCanonicalRequest("POST", None, Some("text/plain"), "Tue, 22 May 2012 21:13:19 UTC", headers, "/bucketName/testFile", Map("uploads" -> Seq("")))
+        canonicalRequest must_==
+          "POST\n" +
+          "\n" +
+          "text/plain\n" +
+          "Tue, 22 May 2012 21:13:19 UTC\n" +
+          "x-amz-security-token:securityToken\n" +
+          "/bucketName/testFile?uploads"
       }
 
     }
