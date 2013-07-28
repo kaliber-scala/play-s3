@@ -10,8 +10,6 @@ import javax.crypto.spec.SecretKeySpec
 import java.security.MessageDigest
 import fly.play.aws.auth.{ AwsCredentials, Signer, SignerUtils }
 
-import play.api.Logger
-
 case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer with SignerUtils {
   private val AwsCredentials(accessKeyId, secretKey, sessionToken, expirationSeconds) = credentials
 
@@ -44,8 +42,6 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
       case Array() => None
       case data => Some(base64Encode(hash(data)))
     }
-
-    Logger.debug("md5: " + contentMd5)
 
     var newHeaders = addHeaders(request.headers, dateTime, contentType, contentMd5)
 
@@ -97,14 +93,14 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
     val sortedHeaders = elligableHeaders.toSeq.sorted
 
     val query = ("?" + queryString
-          .map { 
+          .map {
             case (k, Seq()) => k -> ""
-            case (k, v) => k -> v.head 
+            case (k, v) => k -> v.head
           }
           .toSeq.sorted
-          .map { 
+          .map {
             case (k, "") => urlEncode(k)
-            case (k, v) => urlEncode(k) + "=" + urlEncode(v) 
+            case (k, v) => urlEncode(k) + "=" + urlEncode(v)
           }.mkString("&")) match {
             case "?" => ""
             case s => s
