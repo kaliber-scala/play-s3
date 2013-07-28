@@ -10,6 +10,8 @@ import javax.crypto.spec.SecretKeySpec
 import java.security.MessageDigest
 import fly.play.aws.auth.{ AwsCredentials, Signer, SignerUtils }
 
+import play.api.Logger
+
 case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer with SignerUtils {
   private val AwsCredentials(accessKeyId, secretKey, sessionToken, expirationSeconds) = credentials
 
@@ -37,7 +39,13 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
 
     val date = new Date
     val dateTime = rfc822DateFormat format date
-    val contentMd5 = body.map(hash _ andThen base64Encode)
+
+    val contentMd5 = body.flatMap{
+      case Array() => None
+      case data => Some(base64Encode(hash(data)))
+    }
+
+    Logger.debug("md5: " + contentMd5)
 
     var newHeaders = addHeaders(request.headers, dateTime, contentType, contentMd5)
 
@@ -58,17 +66,17 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
 
     val resourcePath = "/" + bucketName + path.getOrElse("")
 
-    val cannonicalRequest = createCannonicalRequest(method, contentMd5, contentType, dateTime, newHeaders, resourcePath)
+    val canonicalRequest = createCanonicalRequest(method, contentMd5, contentType, dateTime, newHeaders, resourcePath, request.queryString)
 
-    val authorizationHeader = "AWS " + accessKeyId + ":" + createSignature(cannonicalRequest)
+    val authorizationHeader = "AWS " + accessKeyId + ":" + createSignature(canonicalRequest)
 
     newHeaders += "Authorization" -> Seq(authorizationHeader)
 
     request.copy(headers = newHeaders)
   }
 
-  private[s3] def createSignature(cannonicalRequest: String) =
-    base64Encode(sign(cannonicalRequest, secretKey))
+  private[s3] def createSignature(canonicalRequest: String) =
+    base64Encode(sign(canonicalRequest, secretKey))
 
   private[s3] def addHeaders(headers: Map[String, Seq[String]], dateTime: String, contentType: Option[String], contentMd5: Option[String]): Map[String, Seq[String]] = {
     var newHeaders = headers
@@ -82,13 +90,27 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
     newHeaders
   }
 
-  private[s3] def createCannonicalRequest(method: String, contentMd5: Option[String], contentType: Option[String], dateTime: String, headers: Map[String, Seq[String]], resourcePath: String): String = {
+  private[s3] def createCanonicalRequest(method: String, contentMd5: Option[String], contentType: Option[String], dateTime: String, headers: Map[String, Seq[String]], resourcePath: String, queryString: Map[String, Seq[String]]): String = {
 
     val elligableHeaders = headers.keys.filter(_.toLowerCase.startsWith("x-amz"))
 
     val sortedHeaders = elligableHeaders.toSeq.sorted
 
-    val cannonicalRequest =
+    val query = ("?" + queryString
+          .map { 
+            case (k, Seq()) => k -> ""
+            case (k, v) => k -> v.head 
+          }
+          .toSeq.sorted
+          .map { 
+            case (k, "") => urlEncode(k)
+            case (k, v) => urlEncode(k) + "=" + urlEncode(v) 
+          }.mkString("&")) match {
+            case "?" => ""
+            case s => s
+          }
+
+    val canonicalRequest =
       method + "\n" +
         /* body md5 */
         contentMd5.getOrElse("") + "\n" +
@@ -99,8 +121,10 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
         /* headers */
         sortedHeaders.map(k => k.toLowerCase + ":" + headers(k).mkString(",") + "\n").mkString +
         /* resourcePath */
-        resourcePath
+        resourcePath +
+        /* queryString */
+        query
 
-    cannonicalRequest
+    canonicalRequest
   }
 }
