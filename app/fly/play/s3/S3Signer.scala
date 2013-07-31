@@ -38,7 +38,7 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
     val date = new Date
     val dateTime = rfc822DateFormat format date
 
-    val contentMd5 = body.flatMap{
+    val contentMd5 = body.flatMap {
       case Array() => None
       case data => Some(base64Encode(hash(data)))
     }
@@ -86,25 +86,39 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
     newHeaders
   }
 
+  private[s3] val subResourceNames = Set(
+    "acl", "lifecycle", "location", "logging", "notification", "partNumber", "policy",
+    "requestPayment", "torrent", "uploadId", "uploads", "versionId", "versioning",
+    "versions", "website")
+
+  private[s3] def getResourceQueryString(queryString: Map[String, Seq[String]]): Option[String] = {
+    val filtered =
+      queryString
+        .filterKeys(subResourceNames)
+        
+    if (filtered.isEmpty) None
+    else {
+      // do not url encode, that would make the signature invalid
+      val result = filtered
+        .map {
+          case (k, v) if (v.isEmpty || v.head == "") => k
+          case (k, v) => k + "=" + v.head
+        }
+      	.toSeq.sorted
+      	.mkString("&")
+      
+      Some("?" + result)
+    }
+    
+  }
+
   private[s3] def createCanonicalRequest(method: String, contentMd5: Option[String], contentType: Option[String], dateTime: String, headers: Map[String, Seq[String]], resourcePath: String, queryString: Map[String, Seq[String]]): String = {
 
     val elligableHeaders = headers.keys.filter(_.toLowerCase.startsWith("x-amz"))
 
     val sortedHeaders = elligableHeaders.toSeq.sorted
 
-    val query = ("?" + queryString
-          .map {
-            case (k, Seq()) => k -> ""
-            case (k, v) => k -> v.head
-          }
-          .toSeq.sorted
-          .map {
-            case (k, "") => urlEncode(k)
-            case (k, v) => urlEncode(k) + "=" + urlEncode(v)
-          }.mkString("&")) match {
-            case "?" => ""
-            case s => s
-          }
+    val resourceQueryString = getResourceQueryString(queryString)
 
     val canonicalRequest =
       method + "\n" +
@@ -116,10 +130,8 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
         dateTime + "\n" +
         /* headers */
         sortedHeaders.map(k => k.toLowerCase + ":" + headers(k).mkString(",") + "\n").mkString +
-        /* resourcePath */
-        resourcePath +
-        /* queryString */
-        query
+        /* resourcePath + resourceQueryString */
+        resourcePath + resourceQueryString.getOrElse("")
 
     canonicalRequest
   }

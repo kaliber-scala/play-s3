@@ -56,8 +56,8 @@ object S3SignerSpec extends Specification {
           "/bucketName/testFile"
       }
 
-      "for POST request with query string" in {
-         val headers = Map(
+      "for POST request with resource query string" in {
+        val headers = Map(
           "Date" -> Seq("Tue, 22 May 2012 21:13:19 UTC"),
           "Content-Type" -> Seq("text/plain"),
           "Content-Md5" -> Seq("Md5String"),
@@ -71,6 +71,23 @@ object S3SignerSpec extends Specification {
           "Tue, 22 May 2012 21:13:19 UTC\n" +
           "x-amz-security-token:securityToken\n" +
           "/bucketName/testFile?uploads"
+      }
+
+      "for POST request with other query string" in {
+        val headers = Map(
+          "Date" -> Seq("Tue, 22 May 2012 21:13:19 UTC"),
+          "Content-Type" -> Seq("text/plain"),
+          "Content-Md5" -> Seq("Md5String"),
+          "X-Amz-Security-Token" -> Seq("securityToken"))
+
+        val canonicalRequest = signer.createCanonicalRequest("POST", None, Some("text/plain"), "Tue, 22 May 2012 21:13:19 UTC", headers, "/bucketName/testFile", Map("test" -> Seq("test")))
+        canonicalRequest must_==
+          "POST\n" +
+          "\n" +
+          "text/plain\n" +
+          "Tue, 22 May 2012 21:13:19 UTC\n" +
+          "x-amz-security-token:securityToken\n" +
+          "/bucketName/testFile"
       }
 
     }
