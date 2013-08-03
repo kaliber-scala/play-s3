@@ -18,9 +18,7 @@ object ApplicationBuild extends Build {
   val main = play.Project(appName, appVersion, appDependencies).settings(
     organization := "nl.rhinofly",
     resolvers += rhinoflyRepo("RELEASE").get,
-    // just for tests
-     publishTo := Some(Resolver.file("file",  new File(Path.userHome.absolutePath+"/.m2/repository"))),
-//    publishTo <<= version(rhinoflyRepo),
+    publishTo <<= version(rhinoflyRepo),
     credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"))
 
 }
