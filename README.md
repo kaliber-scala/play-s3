@@ -82,9 +82,9 @@ result
 Removing a file:
 
 ``` scala
-val result = bucket - BucketFile(fileName, mimeType, byteArray)
+val result = bucket - fileName
 //or
-val result = bucket remove BucketFile(fileName, mimeType, byteArray)
+val result = bucket remove fileName
 
 ``` 
 
