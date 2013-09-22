@@ -5,7 +5,7 @@ Each new project we start is being developed in Scala. Therefore, we are in need
 Are you the Scala programmer we are looking for? Take a look at the [job description](http://rhinofly.nl/vacature-scala.html) (in Dutch) and give the Scala puzzle a try! Send us your solution and you will be invited for a job interview.
 * * *
 
-Amazon Simple Storage Service (S3) module for Play 2.1
+Amazon Simple Storage Service (S3) module for Play 2.2
 =====================================================
 
 A minimal S3 API wrapper. Allows you to list, get, add and remove items from a bucket.
@@ -16,7 +16,7 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "play-s3" % "3.1.1"
+    "nl.rhinofly" %% "play-s3" % "3.2.1"
   )
   
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
