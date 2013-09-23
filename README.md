@@ -16,7 +16,7 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "play-s3" % "3.2.1"
+    "nl.rhinofly" %% "play-s3" % "3.3.0"
   )
   
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
@@ -71,7 +71,7 @@ val result = bucket add BucketFile(fileName, mimeType, byteArray, acl, headers)
 
 result
   .map { unit => 
-	Logger.info("Saved the file")
+    Logger.info("Saved the file")
   }
   .recover {
     case S3Exception(status, code, message, originalXml) => Logger.info("Error: " + message)
@@ -94,7 +94,7 @@ Retrieving a file:
 val result = bucket get "fileName"
 
 result.map { 
-	case BucketFile(name, contentType, content, acl, headers) => //...
+    case BucketFile(name, contentType, content, acl, headers) => //...
 }
 //or
 val file = Await.result(result, 10 seconds)
@@ -124,6 +124,24 @@ Renaming a file:
 
 ``` scala
 val result = bucket rename("oldFileName", "newFileName", ACL)
+```
+
+Multipart file upload:
+
+``` scala
+
+// Retrieve an upload ticket
+val result:Future[BucketFileUploadTicket] = 
+  bucket initiateMultipartUpload BucketFile(fileName, mimeType)
+
+// Upload the parts and save the tickets
+val result:Future[BucketFilePartUploadTicket] = 
+  bucket uploadPart (uploadTicket, BucketFilePart(partNumber, content))
+
+// Complete the upload using both the upload ticket and the part upload tickets
+val result:Future[Unit] =    
+  bucket completeMultipartUpload (uploadTicket, partUploadTickets)
+
 ```
 
 More examples can be found in the `S3Spec` in the `test` folder. In order to run the tests you need 

@@ -20,6 +20,7 @@ import scala.util.Success
 import scala.util.Failure
 import scala.concurrent.duration.Duration
 import java.lang.IllegalArgumentException
+import scala.concurrent.Awaitable
 
 class S3Spec extends Specification {
 
@@ -38,6 +39,12 @@ class S3Spec extends Specification {
   }
 
   def s3WithCredentials = S3.fromConfig
+
+  def await[T](a: Awaitable[T]): T =
+    Await.result(a, Duration.Inf)
+
+  def noException[T](a: Awaitable[T]) =
+    await(a) must not(throwA[Throwable])
 
   "S3" should {
 
@@ -102,8 +109,8 @@ class S3Spec extends Specification {
       val result = testBucket.get("nonExistingElement")
       val value = Await.ready(result, Duration.Inf).value.get
 
-      value match {
-        case Failure(S3Exception(404, "NoSuchKey", _, _)) => success
+      value must beLike {
+        case Failure(S3Exception(404, "NoSuchKey", _, _)) => ok
         case Failure(err) => failure("Unexpected failure: " + err)
         case Success(x) => failure("Error was expected, no error received: " + x)
       }
@@ -115,13 +122,13 @@ class S3Spec extends Specification {
 		        This is a bucket used for testing the S3 module of play
 		        """.getBytes)
 
-      Await.result(result, Duration.Inf) must not(throwA[Throwable])
+      noException(result)
     }
 
     "with the correct mime type" inApp {
 
       val result = s3WithCredentials.get(testBucket.name, Some("README.txt"), None, None)
-      val value = Await.result(result, Duration.Inf)
+      val value = await(result)
 
       value.header(HeaderNames.CONTENT_TYPE) must_== Some("text/plain")
     }
@@ -129,7 +136,7 @@ class S3Spec extends Specification {
     "be able to check if it exists" inApp {
 
       val result = testBucket get "README.txt"
-      val value = Await.result(result, Duration.Inf)
+      val value = await(result)
 
       value match {
         case BucketFile("README.txt", _, _, _, _) => success
@@ -143,7 +150,7 @@ class S3Spec extends Specification {
 		        This is a bucket used for testing the S3 module of play
 		        """.getBytes)
 
-      Await.result(result, Duration.Inf) must not(throwA[Throwable])
+      noException(result)
     }
 
     "list should be iterable" inApp {
@@ -154,14 +161,14 @@ class S3Spec extends Specification {
     "list should have a size of 2" inApp {
 
       val result = testBucket.list
-      val value = Await.result(result, Duration.Inf)
+      val value = await(result)
 
       value.size === 2
     }
 
     "list should have the correct contents" inApp {
       val result = testBucket.list
-      val value = Await.result(result, Duration.Inf)
+      val value = await(result)
 
       val seq = value.toSeq
       seq(0) match {
@@ -177,7 +184,7 @@ class S3Spec extends Specification {
     "list with prefix should return the correct contents" inApp {
 
       val result = testBucket.list("testPrefix/")
-      val value = Await.result(result, Duration.Inf)
+      val value = await(result)
       value.toSeq(0) match {
         case BucketItem("testPrefix/README.txt", false) => success
         case f => failure("Wrong file returned: " + f)
@@ -188,7 +195,7 @@ class S3Spec extends Specification {
 
       val result = testBucket - "testPrefix/README.txt"
 
-      Await.result(result, Duration.Inf) must not(throwA[Throwable])
+      noException(result)
     }
 
     var url = ""
@@ -201,27 +208,27 @@ class S3Spec extends Specification {
 		        This is a bucket used for testing the S3 module of play
 		        """.getBytes, Some(AUTHENTICATED_READ), None)
 
-      Await.result(result, Duration.Inf) must not(throwA[Throwable])
+      noException(result)
     }
 
     "be able to retrieve the private file using the generated url" inApp {
 
       val result = WS.url(url).get
 
-      val value = Await.result(result, Duration.Inf)
+      val value = await(result)
       value.status must_== 200
     }
 
     "be able to rename a file" inApp {
 
       val result = testBucket rename ("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
-      Await.result(result, Duration.Inf) must not(throwA[Throwable])
+      noException(result)
     }
 
     "be able to delete the renamed private file" inApp {
 
       val result = testBucket remove "private2README.txt"
-      Await.result(result, Duration.Inf) must not(throwA[Throwable])
+      noException(result)
     }
 
     "be able to add a file with custom headers" inApp {
@@ -230,13 +237,13 @@ class S3Spec extends Specification {
 		        This file is used for testing custome headers
 		        """.getBytes, None, Some(Map("x-amz-meta-testheader" -> "testHeaderValue")))
 
-      Await.result(result, Duration.Inf) must not(throwA[Throwable])
+      noException(result)
     }
 
     "be able to retrieve a file with custom headers" inApp {
 
       val result = testBucket.get("headerTest.txt")
-      val value = Await.result(result, Duration.Inf)
+      val value = await(result)
       value match {
         case BucketFile("headerTest.txt", _, _, _, Some(headers)) => (headers get "x-amz-meta-testheader") must_== Some("testHeaderValue")
         case f => failure("Wrong file returned: " + f)
@@ -246,25 +253,12 @@ class S3Spec extends Specification {
     "be able to delete the file with custom headers" inApp {
 
       val result = testBucket remove "headerTest.txt"
-      Await.result(result, Duration.Inf) must not(throwA[Throwable])
+      noException(result)
     }
 
     "throw an error if the bucket file contains content on initiateMultipartUpload" inApp {
       val bucketFile = BucketFile("test-multipart-file.txt", "text/plain", Array(0))
       testBucket.initiateMultipartUpload(bucketFile) should throwAn[IllegalArgumentException]
-    }
-
-    "be able to initiate a multipart upload" inApp {
-      val bucketFile = BucketFile("test-multipart-file.txt", "text/plain")
-      val result = testBucket.initiateMultipartUpload(bucketFile)
-      val uploadTicket = Await.result(result, Duration.Inf)
-      uploadTicket must beLike {
-        case BucketFileUploadTicket("test-multipart-file.txt", uploadId) =>
-          uploadId must not beEmpty
-      }
-
-      val abort = testBucket.abortMultipartUpload(uploadTicket)
-      Await.result(abort, Duration.Inf) must not(throwA[Throwable])
     }
 
     "throw an error if the BucketFilePart has a part number that is not between 1 and 10000" inApp {
@@ -282,44 +276,31 @@ class S3Spec extends Specification {
       testBucket.uploadPart(uploadTicket, filePart) must throwAn[IllegalArgumentException]
     }
 
-    "be able to upload a part" inApp {
-      val bucketFile = BucketFile("test-multipart-file.txt", "text/plain")
-      val filePart = BucketFilePart(1, Array.fill(S3.MINIMAL_PART_SIZE)(0))
-      println("Uploading 5MB, this might take some time")
-      val uploadTicket = Await.result(testBucket.initiateMultipartUpload(bucketFile), Duration.Inf)
-      val result = testBucket.uploadPart(uploadTicket, filePart)
-      
-      Await.result(result, Duration.Inf) must beLike {
-        case BucketFilePartUploadTicket(1, eTag) =>
-          eTag must not beEmpty
-      }
-      
-      val abort = testBucket.abortMultipartUpload(uploadTicket)
-      Await.result(abort, Duration.Inf) must not(throwA[Throwable])
-    }
-    
     "be able to complete a multipart upload" inApp {
       val fileName = "test-multipart-file.txt"
-        val fileContentType = "text/plain"
-      val partContent:Array[Byte] = Array.fill(S3.MINIMAL_PART_SIZE)(0) 
+      val fileContentType = "text/plain"
+      val partContent: Array[Byte] = Array.fill(S3.MINIMAL_PART_SIZE)(0)
+
       val bucketFile = BucketFile(fileName, fileContentType)
+      val uploadTicket = await(testBucket.initiateMultipartUpload(bucketFile))
+
+      println("Uploading 5MB to test multipart file upload, this might take some time")
       val filePart = BucketFilePart(1, partContent)
-      println("Uploading 5MB, this might take some time")
-      val uploadTicket = Await.result(testBucket.initiateMultipartUpload(bucketFile), Duration.Inf)
-      val partUploadTicket = Await.result(testBucket.uploadPart(uploadTicket, filePart), Duration.Inf)
+      val partUploadTicket = await(testBucket.uploadPart(uploadTicket, filePart))
+
       val result = testBucket.completeMultipartUpload(uploadTicket, Seq(partUploadTicket))
-      Await.result(result, Duration.Inf) must not(throwA[Throwable])
-      
-      val file = Await.result(testBucket get fileName, Duration.Inf)
+      noException(result)
+
+      val file = await(testBucket get fileName)
 
       file must beLike {
-        case BucketFile(name, contentType, content, _, _) => 
+        case BucketFile(name, contentType, content, _, _) =>
           (name === fileName) and
-          (contentType must startWith(fileContentType)) and
-          (content === partContent)
+            (contentType must startWith(fileContentType)) and
+            (content === partContent)
       }
-      
-      Await.result(testBucket remove fileName, Duration.Inf) must not(throwA[Throwable])
+
+      noException(testBucket remove fileName)
     }
   }
 }
