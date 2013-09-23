@@ -7,6 +7,7 @@ import fly.play.aws.xml.AwsError
 import scala.collection.JavaConversions
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import scala.concurrent.Promise
+import play.api.libs.ws.Response
 
 /**
  * Representation of a bucket
@@ -36,15 +37,7 @@ case class Bucket(
    */
   def get(itemName: String): Future[BucketFile] =
     s3.get(name, Some(itemName), None, None) map S3Response { (status, response) =>
-      //implicits
-      import JavaConversions.mapAsScalaMap
-      import JavaConversions.asScalaBuffer
-
-      val headers =
-        for {
-          (key, value) <- response.ahcResponse.getHeaders.toMap
-          if (value.size > 0)
-        } yield key -> value.head
+      val headers = extractHeaders(response)
 
       BucketFile(itemName,
         headers("Content-Type"),
@@ -113,6 +106,65 @@ case class Bucket(
     }
   }
 
+  /**
+   * Initiates a multipart upload
+   *
+   * @param bucketFile	A representation of the file
+   *
+   * @return The upload id
+   */
+  def initiateMultipartUpload(bucketFile: BucketFile): Future[BucketFileUploadTicket] = {
+    val multipartUpload = s3.initiateMultipartUpload(name, bucketFile)
+    multipartUpload map S3Response { (status, response) =>
+      val uploadId = (response.xml \ "UploadId").text
+      BucketFileUploadTicket(bucketFile.name, uploadId)
+    }
+  }
+
+  /**
+   * Aborts a multipart upload
+   *
+   * @param uploadTicket	The ticket acquired from initiateMultipartUpload
+   *
+   */
+  def abortMultipartUpload(uploadTicket: BucketFileUploadTicket): Future[Unit] =
+    s3.abortMultipartUpload(name, uploadTicket) map unitResponse
+
+  /**
+   * Uploads a part in the multipart upload
+   *
+   * @param uploadTicket    The ticket acquired from initiateMultipartUpload
+   * @param bucketFilePart  The part that you want to upload
+   */
+  def uploadPart(uploadTicket: BucketFileUploadTicket, bucketFilePart: BucketFilePart): Future[BucketFilePartUploadTicket] = {
+    val uploadPart = s3.uploadPart(name, uploadTicket, bucketFilePart)
+
+    uploadPart map S3Response { (status, response) =>
+      val headers = extractHeaders(response)
+      BucketFilePartUploadTicket(bucketFilePart.partNumber, headers("ETag"))
+    }
+  }
+
+  /**
+   * Completes a multipart upload
+   *
+   * @param uploadTicket      The ticket acquired from initiateMultipartUpload
+   * @param partUploadTickets The tickets acquired from uploadPart
+   */
+  def completeMultipartUpload(uploadTicket: BucketFileUploadTicket, partUploadTickets: Seq[BucketFilePartUploadTicket]): Future[Unit] =
+    s3.completeMultipartUpload(name, uploadTicket, partUploadTickets) map unitResponse
+
+  private def extractHeaders(response: Response) = {
+    //implicits
+    import JavaConversions.mapAsScalaMap
+    import JavaConversions.asScalaBuffer
+
+    for {
+      (key, value) <- response.ahcResponse.getHeaders.toMap
+      if (value.size > 0)
+    } yield key -> value.head
+  }
+
   private def listResponse =
     S3Response { (status, response) =>
       val xml = response.xml
@@ -131,7 +183,15 @@ case class BucketItem(name: String, isVirtual: Boolean)
 /**
  * Representation of a file, used in get and add methods of the bucket
  */
-case class BucketFile(name: String, contentType: String, content: Array[Byte], acl: Option[ACL] = None, headers: Option[Map[String, String]] = None)
+case class BucketFile(name: String, contentType: String, content: Array[Byte] = Array.empty, acl: Option[ACL] = None, headers: Option[Map[String, String]] = None)
+
+case class BucketFileUploadTicket(name: String, uploadId: String)
+
+case class BucketFilePart(partNumber: Int, content: Array[Byte])
+
+case class BucketFilePartUploadTicket(partNumber: Int, eTag: String) {
+  def toXml = <Part><PartNumber>{ partNumber }</PartNumber><ETag>{ eTag }</ETag></Part>
+}
 
 case object PUBLIC_READ extends ACL("public-read")
 case object PUBLIC_READ_WRITE extends ACL("public-read-write")

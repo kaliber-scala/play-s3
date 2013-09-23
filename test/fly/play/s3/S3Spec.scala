@@ -19,6 +19,7 @@ import fly.play.aws.auth.AwsCredentials
 import scala.util.Success
 import scala.util.Failure
 import scala.concurrent.duration.Duration
+import java.lang.IllegalArgumentException
 
 class S3Spec extends Specification {
 
@@ -243,9 +244,82 @@ class S3Spec extends Specification {
     }
 
     "be able to delete the file with custom headers" inApp {
-      
+
       val result = testBucket remove "headerTest.txt"
       Await.result(result, Duration.Inf) must not(throwA[Throwable])
+    }
+
+    "throw an error if the bucket file contains content on initiateMultipartUpload" inApp {
+      val bucketFile = BucketFile("test-multipart-file.txt", "text/plain", Array(0))
+      testBucket.initiateMultipartUpload(bucketFile) should throwAn[IllegalArgumentException]
+    }
+
+    "be able to initiate a multipart upload" inApp {
+      val bucketFile = BucketFile("test-multipart-file.txt", "text/plain")
+      val result = testBucket.initiateMultipartUpload(bucketFile)
+      val uploadTicket = Await.result(result, Duration.Inf)
+      uploadTicket must beLike {
+        case BucketFileUploadTicket("test-multipart-file.txt", uploadId) =>
+          uploadId must not beEmpty
+      }
+
+      val abort = testBucket.abortMultipartUpload(uploadTicket)
+      Await.result(abort, Duration.Inf) must not(throwA[Throwable])
+    }
+
+    "throw an error if the BucketFilePart has a part number that is not between 1 and 10000" inApp {
+      val uploadTicket = BucketFileUploadTicket("test-multipart-file.txt", "")
+      val filePart1 = BucketFilePart(0, Array.empty)
+      val filePart2 = BucketFilePart(10001, Array.empty)
+
+      testBucket.uploadPart(uploadTicket, filePart1) must throwAn[IllegalArgumentException]
+      testBucket.uploadPart(uploadTicket, filePart2) must throwAn[IllegalArgumentException]
+    }
+
+    "throw an error if the BucketFilePart is less than 5mb" inApp {
+      val uploadTicket = BucketFileUploadTicket("test-multipart-file.txt", "")
+      val filePart = BucketFilePart(1, Array.empty)
+      testBucket.uploadPart(uploadTicket, filePart) must throwAn[IllegalArgumentException]
+    }
+
+    "be able to upload a part" inApp {
+      val bucketFile = BucketFile("test-multipart-file.txt", "text/plain")
+      val filePart = BucketFilePart(1, Array.fill(S3.MINIMAL_PART_SIZE)(0))
+      println("Uploading 5MB, this might take some time")
+      val uploadTicket = Await.result(testBucket.initiateMultipartUpload(bucketFile), Duration.Inf)
+      val result = testBucket.uploadPart(uploadTicket, filePart)
+      
+      Await.result(result, Duration.Inf) must beLike {
+        case BucketFilePartUploadTicket(1, eTag) =>
+          eTag must not beEmpty
+      }
+      
+      val abort = testBucket.abortMultipartUpload(uploadTicket)
+      Await.result(abort, Duration.Inf) must not(throwA[Throwable])
+    }
+    
+    "be able to complete a multipart upload" inApp {
+      val fileName = "test-multipart-file.txt"
+        val fileContentType = "text/plain"
+      val partContent:Array[Byte] = Array.fill(S3.MINIMAL_PART_SIZE)(0) 
+      val bucketFile = BucketFile(fileName, fileContentType)
+      val filePart = BucketFilePart(1, partContent)
+      println("Uploading 5MB, this might take some time")
+      val uploadTicket = Await.result(testBucket.initiateMultipartUpload(bucketFile), Duration.Inf)
+      val partUploadTicket = Await.result(testBucket.uploadPart(uploadTicket, filePart), Duration.Inf)
+      val result = testBucket.completeMultipartUpload(uploadTicket, Seq(partUploadTicket))
+      Await.result(result, Duration.Inf) must not(throwA[Throwable])
+      
+      val file = Await.result(testBucket get fileName, Duration.Inf)
+
+      file must beLike {
+        case BucketFile(name, contentType, content, _, _) => 
+          (name === fileName) and
+          (contentType must startWith(fileContentType)) and
+          (content === partContent)
+      }
+      
+      Await.result(testBucket remove fileName, Duration.Inf) must not(throwA[Throwable])
     }
   }
 }
