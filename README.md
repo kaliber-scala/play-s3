@@ -17,6 +17,8 @@ Installation
 ``` scala
   val appDependencies = Seq(
     "nl.rhinofly" %% "play-s3" % "3.3.0"
+    // use the following version for play 2.1
+    //"nl.rhinofly" %% "play-s3" % "3.1.1"
   )
   
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
