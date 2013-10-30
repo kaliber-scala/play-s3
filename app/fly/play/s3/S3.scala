@@ -103,6 +103,14 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
       .withHeaders("X-Amz-acl" -> acl.value :: headers: _*)
       .put(bucketFile.content)
   }
+  
+  def putAcl(bucketName: String, sourcePath: String, acl: ACL): Future[Response] = {
+    awsWithSigner
+      .url(httpUrl(bucketName, sourcePath))
+      .withQueryString("acl" -> "")
+      .withHeaders("X-Amz-acl" -> acl.value)
+      .put
+  }
 
   /**
    * Lowlevel method to call get on a bucket or a specific file

@@ -70,6 +70,13 @@ case class Bucket(
   def add(bucketFile: BucketFile): Future[Unit] =
     s3.put(name, bucketFile) map unitResponse
 
+  
+  /**
+   * Modifies the ACL of given item
+   */
+  def acl(sourceName: String, acl: ACL): Future[Response] = 
+    s3.putAcl(name,sourceName,acl)
+  
   /**
    * @see remove
    */
