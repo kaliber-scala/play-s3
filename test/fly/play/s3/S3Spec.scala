@@ -18,33 +18,16 @@ import play.api.test.Helpers._
 import fly.play.aws.auth.AwsCredentials
 import scala.util.Success
 import scala.util.Failure
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import java.lang.IllegalArgumentException
 import scala.concurrent.Awaitable
+import org.specs2.time.NoTimeConversions
 
-class S3Spec extends Specification {
+class S3Spec extends Specification with TestUtils with NoTimeConversions {
 
   sequential
 
-  val testBucketName = "s3playlibrary.rhinofly.net"
-
-  def fakeApplication(additionalConfiguration: Map[String, _ <: Any] = Map.empty) =
-    FakeApplication(new File("./test"), additionalConfiguration = additionalConfiguration)
-
-  implicit class InAppExample(s: String) {
-    def inApp[T: AsResult](r: => T): Example =
-      s in running(fakeApplication()) {
-        r
-      }
-  }
-
   def s3WithCredentials = S3.fromConfig
-
-  def await[T](a: Awaitable[T]): T =
-    Await.result(a, Duration.Inf)
-
-  def noException[T](a: Awaitable[T]) =
-    await(a) must not(throwA[Throwable])
 
   "S3" should {
 
@@ -86,7 +69,6 @@ class S3Spec extends Specification {
   }
 
   "Bucket" should {
-    def testBucket = S3(testBucketName)
 
     "by default have / as delimiter" inApp {
       testBucket.delimiter must_== Some("/")
@@ -199,11 +181,11 @@ class S3Spec extends Specification {
     }
 
     var url = ""
+    val fileName = "privateREADME.txt"
 
     "be able to add a file with private ACL and create a url for it" inApp {
 
-      val fileName = "privateREADME.txt"
-      url = testBucket.url(fileName, 86400)
+      url = testBucket.url(fileName, 24.hours.toSeconds)
       val result = testBucket + BucketFile(fileName, "text/plain", """
 		        This is a bucket used for testing the S3 module of play
 		        """.getBytes, Some(AUTHENTICATED_READ), None)
@@ -211,6 +193,16 @@ class S3Spec extends Specification {
       noException(result)
     }
 
+    "be able to create a url with fast expiration time and get a timeout" inApp {
+
+      val url = testBucket.url(fileName, -60)
+
+      val result = WS.url(url).get
+      
+      val value = await(result)
+      value.status must_== 403
+    }
+    
     "be able to retrieve the private file using the generated url" inApp {
 
       val result = WS.url(url).get
@@ -254,53 +246,6 @@ class S3Spec extends Specification {
 
       val result = testBucket remove "headerTest.txt"
       noException(result)
-    }
-
-    "throw an error if the bucket file contains content on initiateMultipartUpload" inApp {
-      val bucketFile = BucketFile("test-multipart-file.txt", "text/plain", Array(0))
-      testBucket.initiateMultipartUpload(bucketFile) should throwAn[IllegalArgumentException]
-    }
-
-    "throw an error if the BucketFilePart has a part number that is not between 1 and 10000" inApp {
-      val uploadTicket = BucketFileUploadTicket("test-multipart-file.txt", "")
-      val filePart1 = BucketFilePart(0, Array.empty)
-      val filePart2 = BucketFilePart(10001, Array.empty)
-
-      testBucket.uploadPart(uploadTicket, filePart1) must throwAn[IllegalArgumentException]
-      testBucket.uploadPart(uploadTicket, filePart2) must throwAn[IllegalArgumentException]
-    }
-
-    "throw an error if the BucketFilePart is less than 5mb" inApp {
-      val uploadTicket = BucketFileUploadTicket("test-multipart-file.txt", "")
-      val filePart = BucketFilePart(1, Array.empty)
-      testBucket.uploadPart(uploadTicket, filePart) must throwAn[IllegalArgumentException]
-    }
-
-    "be able to complete a multipart upload" inApp {
-      val fileName = "test-multipart-file.txt"
-      val fileContentType = "text/plain"
-      val partContent: Array[Byte] = Array.fill(S3.MINIMAL_PART_SIZE)(0)
-
-      val bucketFile = BucketFile(fileName, fileContentType)
-      val uploadTicket = await(testBucket.initiateMultipartUpload(bucketFile))
-
-      println("Uploading 5MB to test multipart file upload, this might take some time")
-      val filePart = BucketFilePart(1, partContent)
-      val partUploadTicket = await(testBucket.uploadPart(uploadTicket, filePart))
-
-      val result = testBucket.completeMultipartUpload(uploadTicket, Seq(partUploadTicket))
-      noException(result)
-
-      val file = await(testBucket get fileName)
-
-      file must beLike {
-        case BucketFile(name, contentType, content, _, _) =>
-          (name === fileName) and
-            (contentType must startWith(fileContentType)) and
-            (content === partContent)
-      }
-
-      noException(testBucket remove fileName)
     }
   }
 }

@@ -17,7 +17,7 @@ import scala.collection.JavaConversions
 /**
  * Amazon Simple Storage Service
  */
-object S3 {
+object S3 extends S3Like {
 
   val MINIMAL_PART_SIZE = 5 * 1024 * 1024
 
