@@ -8,6 +8,7 @@ import scala.collection.JavaConversions
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import scala.concurrent.Promise
 import play.api.libs.ws.Response
+import play.api.libs.json._
 
 /**
  * Representation of a bucket
@@ -20,6 +21,8 @@ case class Bucket(
   name: String,
   delimiter: Option[String] = Some("/"),
   s3: S3) {
+  
+  val DEFAULT_DOCUMENT_EXPIRY = 15 * 60 * 1000
 
   /**
    * Creates an authenticated url for an item with the given name
@@ -29,7 +32,25 @@ case class Bucket(
    */
   def url(itemName: String, expires: Long): String =
     s3.url(name, itemName, ((new Date).getTime / 1000) + expires)
-
+  
+  /**
+   * Creates an unsigned url for the given item name
+   * 
+   * @param itemName  The item for which the url should be created
+   */
+  def url(itemName: String): String = 
+    s3.url(name, itemName)
+  
+  /**
+   * Creates an upload policy for the given item name 
+   * 
+   * @param itemName  The item for which the policy should be created
+   * @param conditions sequence of conditions which will apply to the upload policy.
+   * @param expiresIn the number of milliseconds in which this policy will expire
+   */
+  def policy(itemName: String, acl: ACL, conditions: Seq[JsValue], expiresIn: Long = DEFAULT_DOCUMENT_EXPIRY): JsObject = 
+    s3.policy(name, itemName, acl, conditions, expiresIn)
+  
   /**
    * Retrieves a single item with the given name
    *
@@ -38,7 +59,6 @@ case class Bucket(
   def get(itemName: String): Future[BucketFile] =
     s3.get(name, Some(itemName), None, None) map S3Response { (status, response) =>
       val headers = extractHeaders(response)
-
       BucketFile(itemName,
         headers("Content-Type"),
         response.ahcResponse.getResponseBodyAsBytes,
@@ -74,9 +94,12 @@ case class Bucket(
   /**
    * Modifies the ACL of given item
    */
-  def acl(sourceName: String, acl: ACL): Future[Response] = 
+  def putAcl(sourceName: String, acl: ACL): Future[Response] = 
     s3.putAcl(name,sourceName,acl)
   
+    
+  def getAcl(sourceName: String): Future[Response] =
+    s3.getAcl(name,sourceName)
   /**
    * @see remove
    */

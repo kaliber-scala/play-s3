@@ -2,6 +2,7 @@ package fly.play.s3
 
 import play.api.libs.ws.WS
 import play.api.http.{ Writeable, ContentTypeOf }
+import play.api.libs.json._
 import java.net.URI
 import fly.play.aws.Aws
 import java.util.Date
@@ -29,6 +30,15 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
     val md = MessageDigest getInstance "MD5"
     md update bytes
     md.digest
+  }
+  
+  case class SignedPolicyDocument(policy: String,signature: String)
+  
+  def sign(policyDocument: JsObject): SignedPolicyDocument = {
+    val encodedPolicy =  base64Encode(policyDocument.toString.getBytes(DEFAULT_ENCODING))
+        .replaceAll("\n", "")
+        .replaceAll("\r","")
+    SignedPolicyDocument(encodedPolicy,base64Encode(sign(encodedPolicy,secretKey)))
   }
 
   private[s3] def addAuthorizationHeaders(request: WS.WSRequestHolder, method: String, body: Option[Array[Byte]], contentType: Option[String]): WS.WSRequestHolder = {
