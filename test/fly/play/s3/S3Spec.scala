@@ -27,7 +27,7 @@ class S3Spec extends Specification {
 
   sequential
 
-  val testBucketName = "s3playlibrary.goldv.net"
+  val testBucketName = "s3playlibrary.rhinofly.net"
 
   def fakeApplication(additionalConfiguration: Map[String, _ <: Any] = Map.empty) =
     FakeApplication(new File("./test"), additionalConfiguration = additionalConfiguration)
