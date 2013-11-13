@@ -11,3 +11,5 @@ dist
 test/conf
 /.cache
 .target
+.idea/
+.idea_modules/
