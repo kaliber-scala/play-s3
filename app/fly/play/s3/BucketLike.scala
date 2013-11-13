@@ -19,4 +19,6 @@ trait BucketLike {
   def abortMultipartUpload(uploadTicket: BucketFileUploadTicket): Future[Unit]
   def uploadPart(uploadTicket: BucketFileUploadTicket, bucketFilePart: BucketFilePart): Future[BucketFilePartUploadTicket]
   def completeMultipartUpload(uploadTicket: BucketFileUploadTicket, partUploadTickets: Seq[BucketFilePartUploadTicket]): Future[Unit]
+
+  def delimiter: Option[String]
 }

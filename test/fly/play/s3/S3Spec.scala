@@ -1,33 +1,24 @@
 package fly.play.s3
 
-import java.io.File
-import scala.concurrent.Await
 import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
-import org.specs2.mutable.Before
 import org.specs2.mutable.Specification
 import fly.play.aws.auth.SimpleAwsCredentials
-import fly.play.aws.xml.AwsError
 import play.api.http.HeaderNames
 import play.api.libs.ws.WS
-import play.api.test.FakeApplication
-import org.specs2.execute.AsResult
-import org.specs2.specification.Example
-import play.api.test.FakeApplication
 import play.api.test.Helpers._
-import fly.play.aws.auth.AwsCredentials
-import scala.util.Success
-import scala.util.Failure
 import scala.concurrent.duration._
-import java.lang.IllegalArgumentException
-import scala.concurrent.Awaitable
 import org.specs2.time.NoTimeConversions
 
-class S3Spec extends Specification with TestUtils with NoTimeConversions {
+class S3Spec extends Specification with TestUtils with NoTimeConversions with S3LikeSpec {
 
   sequential
 
-  def s3WithCredentials = S3.fromConfig
+  def s3WithCredentials: S3 = S3.fromConfig
+
+
+  override def testBucket = S3(testBucketName)
+
+  override def getS3Like = S3
 
   "S3" should {
 
@@ -51,10 +42,6 @@ class S3Spec extends Specification with TestUtils with NoTimeConversions {
       }
     }
 
-    "return an instance of bucket" inApp {
-      S3(testBucketName) must beAnInstanceOf[Bucket]
-    }
-
     "return an instance of bucket with different credentials" inApp {
       implicit val awsCredentials = SimpleAwsCredentials("test", "test")
       val bucket = S3(testBucketName)
@@ -69,34 +56,6 @@ class S3Spec extends Specification with TestUtils with NoTimeConversions {
   }
 
   "Bucket" should {
-
-    "by default have / as delimiter" inApp {
-      testBucket.delimiter must_== Some("/")
-    }
-
-    "should be able to change delimiter" inApp {
-      var bucket = testBucket
-      bucket = bucket withDelimiter Some("-")
-      bucket.delimiter must_== Some("-")
-
-      bucket = bucket withDelimiter None
-      bucket.delimiter must_== None
-
-      bucket = bucket withDelimiter "/"
-      bucket.delimiter must_== Some("/")
-    }
-
-    "give an error if we request an element that does not exist" inApp {
-
-      val result = testBucket.get("nonExistingElement")
-      val value = Await.ready(result, Duration.Inf).value.get
-
-      value must beLike {
-        case Failure(S3Exception(404, "NoSuchKey", _, _)) => ok
-        case Failure(err) => failure("Unexpected failure: " + err)
-        case Success(x) => failure("Error was expected, no error received: " + x)
-      }
-    }
 
     "be able to add a file" inApp {
 
@@ -198,11 +157,11 @@ class S3Spec extends Specification with TestUtils with NoTimeConversions {
       val url = testBucket.url(fileName, -60)
 
       val result = WS.url(url).get
-      
+
       val value = await(result)
       value.status must_== 403
     }
-    
+
     "be able to retrieve the private file using the generated url" inApp {
 
       val result = WS.url(url).get

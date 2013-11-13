@@ -13,9 +13,9 @@ import scala.concurrent.duration.Duration
 trait TestUtils { self:Specification =>
   
   val testBucketName = "s3playlibrary.rhinofly.net"
-  
-  def testBucket = S3(testBucketName)
-  
+
+  def testBucket: BucketLike
+
   def fakeApplication(additionalConfiguration: Map[String, _ <: Any] = Map.empty) =
     FakeApplication(new File("./test"), additionalConfiguration = additionalConfiguration)
   

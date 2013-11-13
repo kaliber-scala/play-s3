@@ -2,7 +2,7 @@ package fly.play.s3
 
 import org.specs2.mutable.Specification
 
-object MultipartUploadSpec extends Specification with TestUtils {
+object MultipartUploadSpec extends Specification with TestUtils with S3TestUtils {
 
   sequential
 
