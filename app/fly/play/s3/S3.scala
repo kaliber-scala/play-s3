@@ -19,6 +19,7 @@ import scala.collection.JavaConversions
  */
 object S3 {
 
+  @deprecated("The minimal part size is not checked anymore, this variable will be removed", "3.3.1")
   val MINIMAL_PART_SIZE = 5 * 1024 * 1024
 
   def config = play.api.Play.current.configuration
@@ -230,7 +231,6 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
   def uploadPart(bucketName: String, uploadTicket: BucketFileUploadTicket, bucketFilePart: BucketFilePart): Future[Response] = {
     require(bucketFilePart.partNumber > 0, "The partNumber must be greater than 0")
     require(bucketFilePart.partNumber < 10001, "The partNumber must be lesser than 10001")
-    require(bucketFilePart.content.size >= S3.MINIMAL_PART_SIZE, "A part must be at least 5MB in size")
 
     awsWithSigner
       .url(httpUrl(bucketName, uploadTicket.name))

@@ -270,21 +270,14 @@ class S3Spec extends Specification {
       testBucket.uploadPart(uploadTicket, filePart2) must throwAn[IllegalArgumentException]
     }
 
-    "throw an error if the BucketFilePart is less than 5mb" inApp {
-      val uploadTicket = BucketFileUploadTicket("test-multipart-file.txt", "")
-      val filePart = BucketFilePart(1, Array.empty)
-      testBucket.uploadPart(uploadTicket, filePart) must throwAn[IllegalArgumentException]
-    }
-
     "be able to complete a multipart upload" inApp {
       val fileName = "test-multipart-file.txt"
       val fileContentType = "text/plain"
-      val partContent: Array[Byte] = Array.fill(S3.MINIMAL_PART_SIZE)(0)
+      val partContent: Array[Byte] = Array.fill(100)(0)
 
       val bucketFile = BucketFile(fileName, fileContentType)
       val uploadTicket = await(testBucket.initiateMultipartUpload(bucketFile))
 
-      println("Uploading 5MB to test multipart file upload, this might take some time")
       val filePart = BucketFilePart(1, partContent)
       val partUploadTicket = await(testBucket.uploadPart(uploadTicket, filePart))
 
