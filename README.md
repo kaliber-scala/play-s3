@@ -108,11 +108,9 @@ Listing the contents of a bucket:
 ``` scala
 val result = bucket.list
 
-result.map {
-  case l: List[BucketItem] => {
-    l.map {
-      case BucketItem(name, isVirtual) => //...
-    }
+result.map { items =>
+  items.map {
+    case BucketItem(name, isVirtual) => //...
   }
 }
 
