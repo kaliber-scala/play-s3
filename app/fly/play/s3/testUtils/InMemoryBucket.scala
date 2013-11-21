@@ -83,12 +83,12 @@ case class InMemoryBucket(
 
   def fromUrl(url: String): Future[BucketFile] = 
     if (urls contains url) {
-    	val expired = Future failed S3Exception(403, "Forbidden", "Request has expired", None)
-    	val itemName = urls(url)      
-    	itemName
-    		.map(get)
-    		.getOrElse(expired)
-    } 
+      val expired = Future failed S3Exception(403, "Forbidden", "Request has expired", None)
+      val itemName = urls(url)
+      itemName
+        .map(get)
+        .getOrElse(expired)
+    }
     else notFound(url)
 
   def withDelimiter(delimiter: String): BucketLike =
@@ -97,42 +97,42 @@ case class InMemoryBucket(
     copy(delimiter = delimiter)
 
   def initiateMultipartUpload(bucketFile: BucketFile): Future[BucketFileUploadTicket] = {
-      val ticket: BucketFileUploadTicket = BucketFileUploadTicket(bucketFile.name, UUID.nameUUIDFromBytes(bucketFile.content).toString)
+    val ticket: BucketFileUploadTicket = BucketFileUploadTicket(bucketFile.name, UUID.nameUUIDFromBytes(bucketFile.content).toString)
 
-      partialUploads += ticket -> PartialUpload(bucketFile, Map())
-      ticket
+    partialUploads += ticket -> PartialUpload(bucketFile, Map())
+    ticket
+  }
+
+  def abortMultipartUpload(uploadTicket: BucketFileUploadTicket): Future[Unit] = {
+    partialUploads.remove(uploadTicket)
+    ()
+  }
+
+  val NonActiveUpload = Future failed S3Exception(404, "NotFound", "Requested partial upload not currently active", None)
+
+  def uploadPart(uploadTicket: BucketFileUploadTicket, bucketFilePart: BucketFilePart): Future[BucketFilePartUploadTicket] = {
+    partialUploads.get(uploadTicket).fold[Future[BucketFilePartUploadTicket]] { NonActiveUpload } { partialUpload =>
+      val partNumber = bucketFilePart.partNumber
+      val partTicket = BucketFilePartUploadTicket(partNumber, uploadTicket.uploadId + partNumber)
+      val data = partialUpload.data
+
+      partialUploads += uploadTicket -> partialUpload.copy(data = data + (partTicket -> bucketFilePart.content))
+      partTicket
     }
+  }
 
-      def abortMultipartUpload(uploadTicket: BucketFileUploadTicket): Future[Unit] = {
-        partialUploads.remove(uploadTicket)
+  def completeMultipartUpload(uploadTicket: BucketFileUploadTicket, partUploadTickets: Seq[BucketFilePartUploadTicket]): Future[Unit] = {
+    partialUploads.get(uploadTicket).fold[Future[Unit]] { NonActiveUpload } { partialUpload =>
+      val partials: Seq[Array[Byte]] = partUploadTickets.flatMap { partialUpload.data.get }
+
+      if (partials.size != partUploadTickets.size)
+        Future failed S3Exception(404, "NotFound", "One or more parts not found", None)
+      else {
+        val content: Array[Byte] = partials.flatten.toArray
+        val bucketFile = partialUpload.bucketFile
+        files += bucketFile.name -> bucketFile.copy(content = content)
         ()
       }
-
-      val NonActiveUpload = Future failed S3Exception(404, "NotFound", "Requested partial upload not currently active", None)
-
-      def uploadPart(uploadTicket: BucketFileUploadTicket, bucketFilePart: BucketFilePart): Future[BucketFilePartUploadTicket] = {
-        partialUploads.get(uploadTicket).fold[Future[BucketFilePartUploadTicket]] { NonActiveUpload } { partialUpload =>
-          val partNumber = bucketFilePart.partNumber
-          val partTicket = BucketFilePartUploadTicket(partNumber, uploadTicket.uploadId + partNumber)
-          val data = partialUpload.data
-
-          partialUploads += uploadTicket -> partialUpload.copy(data = data + (partTicket -> bucketFilePart.content))
-          partTicket
-        }
-      }
-
-      def completeMultipartUpload(uploadTicket: BucketFileUploadTicket, partUploadTickets: Seq[BucketFilePartUploadTicket]): Future[Unit] = {
-        partialUploads.get(uploadTicket).fold[Future[Unit]] { NonActiveUpload } { partialUpload =>
-          val partials: Seq[Array[Byte]] = partUploadTickets.flatMap { partialUpload.data.get }
-
-          if (partials.size != partUploadTickets.size)
-            Future failed S3Exception(404, "NotFound", "One or more parts not found", None)
-          else {
-            val content: Array[Byte] = partials.flatten.toArray
-            val bucketFile = partialUpload.bucketFile
-            files += bucketFile.name -> bucketFile.copy(content = content)
-            ()
-          }
     }
   }
 

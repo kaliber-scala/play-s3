@@ -5,7 +5,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.{Success, Failure}
 
-trait S3LikeSpec/*[S <: S3Like]*/ { self: Specification with TestUtils =>
+trait S3LikeSpec { self: Specification with TestUtils =>
 
   def getS3Like: S3Like
 
