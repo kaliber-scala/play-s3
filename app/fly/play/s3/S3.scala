@@ -5,9 +5,11 @@ import scala.collection.JavaConversions.asScalaBuffer
 import scala.collection.JavaConversions.mapAsScalaMap
 import scala.concurrent.Future
 import fly.play.aws.Aws
+import fly.play.aws.Aws.dates._
 import fly.play.aws.auth.AwsCredentials
 import fly.play.aws.xml.AwsError
 import fly.play.aws.xml.AwsResponse
+import play.api.libs.json._
 import play.api.http.ContentTypeOf
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.concurrent.Promise
@@ -21,7 +23,7 @@ object S3 {
 
   @deprecated("The minimal part size is not checked anymore, this variable will be removed", "3.3.1")
   val MINIMAL_PART_SIZE = 5 * 1024 * 1024
-
+    
   def config = play.api.Play.current.configuration
 
   def https = config getBoolean "s3.https" getOrElse false
@@ -51,6 +53,12 @@ object S3 {
    */
   def url(bucketName: String, path: String, expires: Long)(implicit credentials: AwsCredentials) =
     fromConfig.url(bucketName, path, expires)
+  
+  /**
+   * Utility method to create an upload policy
+   */
+  def policy(bucketName: String, itemName: String, acl: ACL, conditions: Seq[JsValue], expiresIn: Long)(implicit credentials: AwsCredentials) =
+    fromConfig.policy(bucketName: String, itemName: String, acl: ACL, conditions: Seq[JsValue], expiresIn: Long)
 
 }
 
@@ -59,6 +67,8 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
   lazy val s3Signer = S3Signer(credentials, host)
 
   lazy val awsWithSigner = Aws withSigner s3Signer
+  
+  
 
   /**
    * Utility method to create a bucket.
@@ -102,6 +112,21 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
       .url(httpUrl(bucketName, bucketFile.name))
       .withHeaders("X-Amz-acl" -> acl.value :: headers: _*)
       .put(bucketFile.content)
+  }
+  
+  def putAcl(bucketName: String, sourcePath: String, acl: ACL): Future[Response] = {
+    awsWithSigner
+      .url(httpUrl(bucketName, sourcePath))
+      .withQueryString("acl" -> "")
+      .withHeaders("X-Amz-acl" -> acl.value)
+      .put
+  }
+  
+  def getAcl(bucketName: String, sourcePath: String): Future[Response] = {
+    awsWithSigner
+      .url(httpUrl(bucketName, sourcePath))
+      .withQueryString("acl" -> "")
+      .get
   }
 
   /**
@@ -156,8 +181,40 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
       "?AWSAccessKeyId=" + credentials.accessKeyId +
       "&Signature=" + s3Signer.urlEncode(signature) +
       "&Expires=" + expireString
-
   }
+  
+  /**
+   * Creates an upload policy for direct upload to S3
+   * 
+   * http://docs.aws.amazon.com/AmazonS3/2006-03-01/dev/HTTPPOSTExamples.html
+   * 
+   * @param bucketName The name of the bucket
+   * @param itemName The path of the file to be uploaded
+   * @param acl The acl of the uploaded file
+   * @param conditions The conditions for the uplaoded file. 
+   * @param expiresIn The number of milliseconds in which this policy will expire
+   * 
+   */
+  def policy(bucketName: String, itemName: String, acl: ACL, conditions: Seq[JsValue], expiresIn: Long): JsObject = {
+    val p = Json.obj(
+        "expiration" -> JsString(iso8601DateFormat.format(System.currentTimeMillis + expiresIn)),
+        "conditions" -> (conditions :+ Json.obj("bucket" -> bucketName) :+ Json.obj("key" -> itemName) :+ Json.obj("acl" -> acl.value)))
+   
+    val signedPolicy = s3Signer.sign(p)
+    
+    p ++ Json.obj("AWSAccessKeyId" -> credentials.accessKeyId,
+             "signature" -> signedPolicy.signature,
+             "policy" -> signedPolicy.policy)
+  }
+  
+  /**
+   * creates an unsigned url to the specified file and bucket
+   * 
+   * @param bucketName the name of the bucket
+   * @param path the path of the file we want to create a url for
+   */
+  def url(bucketName: String, path: String): String = 
+    httpUrl(bucketName, path)
 
   /**
    * Lowlevel method to copy a file on S3

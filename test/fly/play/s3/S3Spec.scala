@@ -11,6 +11,7 @@ import fly.play.aws.xml.AwsError
 import play.api.http.HeaderNames
 import play.api.libs.ws.WS
 import play.api.test.FakeApplication
+import play.api.libs.json._
 import org.specs2.execute.AsResult
 import org.specs2.specification.Example
 import play.api.test.FakeApplication
@@ -83,6 +84,20 @@ class S3Spec extends Specification {
       S3.url("s3playlibrary.rhinofly.net", "privateREADME.txt", 1343845068) must_==
         "http://s3playlibrary.rhinofly.net.s3.amazonaws.com/privateREADME.txt?AWSAccessKeyId=AKIAIJJLEMC6OSI2DN2A&Signature=jkbj7%2ByalcC%2Fw%2BKxtMXLIn7b%2Frc%3D&Expires=1343845068"
     }
+    
+    "create an upload policy document" inApp {
+      val policy = S3.policy("s3playlibrary.rhinofly.net", 
+          "privateREADME.txt",
+          PUBLIC_READ,
+          Json.obj("Content-Type" -> "image/jpeg") :: Json.arr("content-length-range",   0,  10000) :: Nil,
+          15 * 60 * 1000)
+      val conditions = Json.arr(Json.obj("Content-Type" -> "image/jpeg"),
+                                             Json.arr("content-length-range",0,10000),
+                                             Json.obj("bucket" -> "s3playlibrary.rhinofly.net"),
+                                             Json.obj("key" -> "privateREADME.txt"),
+                                             Json.obj("acl" -> "public-read"))
+      (policy \ "conditions") == conditions must beTrue
+    }
   }
 
   "Bucket" should {
@@ -120,7 +135,7 @@ class S3Spec extends Specification {
 
       val result = testBucket + BucketFile("README.txt", "text/plain", """
 		        This is a bucket used for testing the S3 module of play
-		        """.getBytes)
+		        """.getBytes,Some(AUTHENTICATED_READ))
 
       noException(result)
     }
@@ -132,12 +147,12 @@ class S3Spec extends Specification {
 
       value.header(HeaderNames.CONTENT_TYPE) must_== Some("text/plain")
     }
-
+      
     "be able to check if it exists" inApp {
 
       val result = testBucket get "README.txt"
       val value = await(result)
-
+            
       value match {
         case BucketFile("README.txt", _, _, _, _) => success
         case f => failure("Wrong file returned: " + f)
@@ -210,7 +225,7 @@ class S3Spec extends Specification {
 
       noException(result)
     }
-
+        
     "be able to retrieve the private file using the generated url" inApp {
 
       val result = WS.url(url).get
@@ -223,6 +238,18 @@ class S3Spec extends Specification {
 
       val result = testBucket rename ("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
       noException(result)
+    }
+    
+   "be able to change the file's ACL" inApp {
+      val result = testBucket.putAcl("private2README.txt", PUBLIC_READ)
+      noException(result)
+    }
+    
+    "be able to check if the file's ACL has been updated" inApp {
+      val result = testBucket.getAcl("private2README.txt")
+      val value = await(result)
+      
+      (value.xml \ "AccessControlList" \ "Grant" \ "Grantee" \ "URI").text endsWith("AllUsers") must beTrue
     }
 
     "be able to delete the renamed private file" inApp {
