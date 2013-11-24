@@ -1,26 +1,27 @@
 package fly.play.s3
 
 import java.io.File
-import scala.concurrent.Await
-import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
-import org.specs2.mutable.Before
-import org.specs2.mutable.Specification
-import fly.play.aws.auth.SimpleAwsCredentials
-import fly.play.aws.xml.AwsError
-import play.api.http.HeaderNames
-import play.api.libs.ws.WS
-import play.api.test.FakeApplication
-import org.specs2.execute.AsResult
-import org.specs2.specification.Example
-import play.api.test.FakeApplication
-import play.api.test.Helpers._
-import fly.play.aws.auth.AwsCredentials
-import scala.util.Success
-import scala.util.Failure
-import scala.concurrent.duration.Duration
 import java.lang.IllegalArgumentException
+import scala.concurrent.Await
 import scala.concurrent.Awaitable
+import scala.concurrent.Future
+import scala.concurrent.duration.Duration
+import org.specs2.execute.AsResult
+import org.specs2.mutable.Specification
+import org.specs2.specification.Example
+import fly.play.aws.auth.SimpleAwsCredentials
+import play.api.http.HeaderNames
+import play.api.test.FakeApplication
+import play.api.test.Helpers.running
+import scala.util.Failure
+import scala.util.Success
+import play.api.libs.ws.WS
+
+import fly.play.s3.acl.FULL_CONTROL
+import fly.play.s3.acl.READ
+import fly.play.s3.acl.Grant
+import fly.play.s3.acl.Group
+import fly.play.s3.acl.CanonicalUser
 
 class S3Spec extends Specification {
 
@@ -223,6 +224,23 @@ class S3Spec extends Specification {
 
       val result = testBucket rename ("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
       noException(result)
+    }
+
+    "be able to change the file's ACL" inApp {
+      val result = testBucket.updateAcl("private2README.txt", PUBLIC_READ)
+      noException(result)
+    }
+
+    "be able to check if the file's ACL has been updated" inApp {
+      val result = testBucket.getAcl("private2README.txt")
+      val value = await(result)
+
+      value must beLike {
+        case Seq(
+          Grant(FULL_CONTROL, CanonicalUser(_, _)),
+          Grant(READ, Group(uri))) =>
+          uri must endWith("AllUsers")
+      }
     }
 
     "be able to delete the renamed private file" inApp {

@@ -16,7 +16,7 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "play-s3" % "3.3.1"
+    "nl.rhinofly" %% "play-s3" % "3.3.2"
     // use the following version for play 2.1
     //"nl.rhinofly" %% "play-s3" % "3.1.1"
   )
@@ -146,6 +146,27 @@ val result:Future[BucketFilePartUploadTicket] =
 val result:Future[Unit] =    
   bucket completeMultipartUpload (uploadTicket, partUploadTickets)
 
+```
+
+Updating the ACL of a file:
+
+``` scala
+val result:Future[Unit] = bucket updateACL ("fileName", ACL)
+```
+
+Retrieving the ACL of a file:
+
+``` scala
+val result = testBucket.getAcl("private2README.txt")
+
+for {
+ aclList <- result
+ grant <- aclList
+} yield 
+  grant match {
+    case Grant(FULL_CONTROL, CanonicalUser(id, displayName)) => //...
+    case Grant(READ, Group(uri)) => //...
+  }
 ```
 
 More examples can be found in the `S3Spec` in the `test` folder. In order to run the tests you need 
