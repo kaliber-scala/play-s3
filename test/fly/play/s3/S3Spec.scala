@@ -16,12 +16,12 @@ import play.api.test.Helpers.running
 import scala.util.Failure
 import scala.util.Success
 import play.api.libs.ws.WS
-
 import fly.play.s3.acl.FULL_CONTROL
 import fly.play.s3.acl.READ
 import fly.play.s3.acl.Grant
 import fly.play.s3.acl.Group
 import fly.play.s3.acl.CanonicalUser
+import play.api.libs.json.Json
 
 class S3Spec extends Specification {
 
@@ -83,6 +83,20 @@ class S3Spec extends Specification {
     "create the correct url" inApp {
       S3.url("s3playlibrary.rhinofly.net", "privateREADME.txt", 1343845068) must_==
         "http://s3playlibrary.rhinofly.net.s3.amazonaws.com/privateREADME.txt?AWSAccessKeyId=AKIAIJJLEMC6OSI2DN2A&Signature=jkbj7%2ByalcC%2Fw%2BKxtMXLIn7b%2Frc%3D&Expires=1343845068"
+    }
+    
+    "create an upload policy document" inApp {
+      val policy = S3(testBucketName).policy(
+          "privateREADME.txt",
+          PUBLIC_READ,
+          Json.obj("Content-Type" -> "image/jpeg") :: Json.arr("content-length-range",   0,  10000) :: Nil,
+          15 * 60 * 1000)
+      val conditions = Json.arr(Json.obj("Content-Type" -> "image/jpeg"),
+                                             Json.arr("content-length-range",0,10000),
+                                             Json.obj("bucket" -> "s3playlibrary.rhinofly.net"),
+                                             Json.obj("key" -> "privateREADME.txt"),
+                                             Json.obj("acl" -> "public-read"))
+      (policy \ "conditions") == conditions must beTrue
     }
   }
 
