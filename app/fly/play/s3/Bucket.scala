@@ -8,6 +8,8 @@ import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.ws.Response
 import fly.play.s3.acl.ACLList
 import scala.xml.Elem
+import play.api.libs.json.JsValue
+import play.api.libs.json.JsObject
 
 /**
  * Representation of a bucket
@@ -21,6 +23,9 @@ case class Bucket(
   delimiter: Option[String] = Some("/"),
   s3: S3) {
 
+  //TODO remove this
+  val DEFAULT_DOCUMENT_EXPIRY = 15 * 60 * 1000
+  
   /**
    * Creates an authenticated url for an item with the given name
    *
@@ -29,7 +34,25 @@ case class Bucket(
    */
   def url(itemName: String, expires: Long): String =
     s3.url(name, itemName, ((new Date).getTime / 1000) + expires)
-
+  
+  /**
+   * Creates an unsigned url for the given item name
+   * 
+   * @param itemName  The item for which the url should be created
+   */
+  def url(itemName: String): String = 
+    s3.url(name, itemName)
+  
+  /**
+   * Creates an upload policy for the given item name 
+   * 
+   * @param itemName  The item for which the policy should be created
+   * @param conditions sequence of conditions which will apply to the upload policy.
+   * @param expiresIn the number of milliseconds in which this policy will expire
+   */
+  def policy(itemName: String, acl: ACL, conditions: Seq[JsValue], expiresIn: Long = DEFAULT_DOCUMENT_EXPIRY): JsObject = 
+    s3.policy(name, itemName, acl, conditions, expiresIn)
+  
   /**
    * Retrieves a single item with the given name
    *
