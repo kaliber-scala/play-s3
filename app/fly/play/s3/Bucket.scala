@@ -1,13 +1,13 @@
 package fly.play.s3
 
-import fly.play.aws.xml.AwsResponse
 import java.util.Date
+import scala.collection.JavaConversions.asScalaBuffer
+import scala.collection.JavaConversions.mapAsScalaMap
 import scala.concurrent.Future
-import fly.play.aws.xml.AwsError
-import scala.collection.JavaConversions
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
-import scala.concurrent.Promise
 import play.api.libs.ws.Response
+import fly.play.s3.acl.ACLList
+import scala.xml.Elem
 
 /**
  * Representation of a bucket
@@ -70,13 +70,6 @@ case class Bucket(
   def add(bucketFile: BucketFile): Future[Unit] =
     s3.put(name, bucketFile) map unitResponse
 
-  
-  /**
-   * Modifies the ACL of given item
-   */
-  def acl(sourceName: String, acl: ACL): Future[Response] = 
-    s3.putAcl(name,sourceName,acl)
-  
   /**
    * @see remove
    */
@@ -161,11 +154,24 @@ case class Bucket(
   def completeMultipartUpload(uploadTicket: BucketFileUploadTicket, partUploadTickets: Seq[BucketFilePartUploadTicket]): Future[Unit] =
     s3.completeMultipartUpload(name, uploadTicket, partUploadTickets) map unitResponse
 
-  private def extractHeaders(response: Response) = {
-    //implicits
-    import JavaConversions.mapAsScalaMap
-    import JavaConversions.asScalaBuffer
+  /**
+   * Updates the ACL of given item
+   * 
+   * @param itemName	The name of file that needs to be updated
+   * @param acl			The ACL
+   */
+  def updateAcl(itemName: String, acl: ACL): Future[Unit] =
+    s3.putAcl(name, itemName, acl) map unitResponse
 
+  /**
+   * Retrieves the ACL
+   * 
+   * @param itemName	The name of the file that you want to retrieve the ACL for
+   */    
+  def getAcl(itemName: String): Future[ACLList] =
+    s3.getAcl(name, itemName) map aclListResponse    
+    
+  private def extractHeaders(response: Response) = {
     for {
       (key, value) <- response.ahcResponse.getHeaders.toMap
       if (value.size > 0)
@@ -178,6 +184,13 @@ case class Bucket(
 
       /* files */ (xml \ "Contents").map(n => BucketItem((n \ "Key").text, false)) ++
         /* folders */ (xml \ "CommonPrefixes").map(n => BucketItem((n \ "Prefix").text, true))
+    } _
+
+  private def aclListResponse =
+    S3Response { (status, response) =>
+      val xml = response.xml
+
+      ACLList((xml \ "AccessControlList").head.asInstanceOf[Elem])
     } _
 
   private def unitResponse = S3Response { (status, response) => } _
@@ -200,6 +213,7 @@ case class BucketFilePartUploadTicket(partNumber: Int, eTag: String) {
   def toXml = <Part><PartNumber>{ partNumber }</PartNumber><ETag>{ eTag }</ETag></Part>
 }
 
+case object PRIVATE extends ACL("private")
 case object PUBLIC_READ extends ACL("public-read")
 case object PUBLIC_READ_WRITE extends ACL("public-read-write")
 case object AUTHENTICATED_READ extends ACL("authenticated-read")

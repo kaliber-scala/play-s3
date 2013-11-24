@@ -1,18 +1,11 @@
 package fly.play.s3
 
-import java.util.Date
-import scala.collection.JavaConversions.asScalaBuffer
-import scala.collection.JavaConversions.mapAsScalaMap
 import scala.concurrent.Future
+
 import fly.play.aws.Aws
 import fly.play.aws.auth.AwsCredentials
-import fly.play.aws.xml.AwsError
-import fly.play.aws.xml.AwsResponse
 import play.api.http.ContentTypeOf
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
-import play.api.libs.concurrent.Promise
 import play.api.libs.ws.Response
-import scala.collection.JavaConversions
 
 /**
  * Amazon Simple Storage Service
@@ -111,6 +104,13 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
       .withHeaders("X-Amz-acl" -> acl.value)
       .put
   }
+  
+  def getAcl(bucketName: String, sourcePath: String): Future[Response] = {
+    awsWithSigner
+      .url(httpUrl(bucketName, sourcePath))
+      .withQueryString("acl" -> "")
+      .get
+  }  
 
   /**
    * Lowlevel method to call get on a bucket or a specific file
