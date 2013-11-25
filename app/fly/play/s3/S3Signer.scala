@@ -1,15 +1,18 @@
 package fly.play.s3
 
-import play.api.libs.ws.WS
-import play.api.http.{ Writeable, ContentTypeOf }
-import play.api.libs.json._
 import java.net.URI
-import fly.play.aws.Aws
+import java.security.MessageDigest
 import java.util.Date
+
+import fly.play.aws.Aws.dates.rfc822DateFormat
+import fly.play.aws.auth.AwsCredentials
+import fly.play.aws.auth.Signer
+import fly.play.aws.auth.SignerUtils
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import java.security.MessageDigest
-import fly.play.aws.auth.{ AwsCredentials, Signer, SignerUtils }
+import play.api.http.ContentTypeOf
+import play.api.http.Writeable
+import play.api.libs.ws.WS
 
 case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer with SignerUtils {
   private val AwsCredentials(accessKeyId, secretKey, sessionToken, expirationSeconds) = credentials
@@ -32,18 +35,7 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
     md.digest
   }
   
-  case class SignedPolicyDocument(policy: String,signature: String)
-  
-  def sign(policyDocument: JsObject): SignedPolicyDocument = {
-    val encodedPolicy =  base64Encode(policyDocument.toString.getBytes(DEFAULT_ENCODING))
-        .replaceAll("\n", "")
-        .replaceAll("\r","")
-    SignedPolicyDocument(encodedPolicy,base64Encode(sign(encodedPolicy,secretKey)))
-  }
-
   private[s3] def addAuthorizationHeaders(request: WS.WSRequestHolder, method: String, body: Option[Array[Byte]], contentType: Option[String]): WS.WSRequestHolder = {
-
-    import Aws.dates._
 
     val date = new Date
     val dateTime = rfc822DateFormat format date
@@ -81,8 +73,8 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
     request.copy(headers = newHeaders)
   }
 
-  private[s3] def createSignature(canonicalRequest: String) =
-    base64Encode(sign(canonicalRequest, secretKey))
+  def createSignature(string: String) =
+    base64Encode(sign(string, secretKey))
 
   private[s3] def addHeaders(headers: Map[String, Seq[String]], dateTime: String, contentType: Option[String], contentMd5: Option[String]): Map[String, Seq[String]] = {
     var newHeaders = headers

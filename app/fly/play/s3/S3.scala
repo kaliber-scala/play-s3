@@ -1,14 +1,11 @@
 package fly.play.s3
 
 import scala.concurrent.Future
+
 import fly.play.aws.Aws
-import fly.play.aws.Aws.dates.iso8601DateFormat
 import fly.play.aws.auth.AwsCredentials
 import play.api.http.ContentTypeOf
 import play.api.libs.ws.Response
-import play.api.libs.json.JsValue
-import play.api.libs.json.JsObject
-import play.api.libs.json.Json
 
 /**
  * Amazon Simple Storage Service
@@ -167,30 +164,6 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
       "?AWSAccessKeyId=" + credentials.accessKeyId +
       "&Signature=" + s3Signer.urlEncode(signature) +
       "&Expires=" + expireString
-  }
-  
-  /**
-   * Creates an upload policy for direct upload to S3
-   * 
-   * http://docs.aws.amazon.com/AmazonS3/2006-03-01/dev/HTTPPOSTExamples.html
-   * 
-   * @param bucketName The name of the bucket
-   * @param itemName The path of the file to be uploaded
-   * @param acl The acl of the uploaded file
-   * @param conditions The conditions for the uplaoded file. 
-   * @param expiresIn The number of milliseconds in which this policy will expire
-   * 
-   */
-  def policy(bucketName: String, itemName: String, acl: ACL, conditions: Seq[JsValue], expiresIn: Long): JsObject = {
-    val p = Json.obj(
-        "expiration" -> iso8601DateFormat.format(System.currentTimeMillis + expiresIn),
-        "conditions" -> (conditions :+ Json.obj("bucket" -> bucketName) :+ Json.obj("key" -> itemName) :+ Json.obj("acl" -> acl.value)))
-   
-    val signedPolicy = s3Signer.sign(p)
-    
-    p ++ Json.obj("AWSAccessKeyId" -> credentials.accessKeyId,
-             "signature" -> signedPolicy.signature,
-             "policy" -> signedPolicy.policy)
   }
   
   /**

@@ -5,7 +5,7 @@ import play.Project._
 object ApplicationBuild extends Build {
 
   val appName = "play-s3"
-  val appVersion = "3.3.2"
+  val appVersion = "3.3.3"
 
   val appDependencies = Seq(
     "nl.rhinofly" %% "play-aws-utils" % "2.4.2")
@@ -19,6 +19,7 @@ object ApplicationBuild extends Build {
     organization := "nl.rhinofly",
     resolvers += rhinoflyRepo("RELEASE").get,
     publishTo <<= version(rhinoflyRepo),
-    credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"))
+    credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
+    scalacOptions += "-feature")
 
 }

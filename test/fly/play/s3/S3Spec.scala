@@ -2,26 +2,36 @@ package fly.play.s3
 
 import java.io.File
 import java.lang.IllegalArgumentException
+import java.util.Date
+
 import scala.concurrent.Await
 import scala.concurrent.Awaitable
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+import scala.util.Failure
+import scala.util.Success
+
 import org.specs2.execute.AsResult
 import org.specs2.mutable.Specification
 import org.specs2.specification.Example
+
 import fly.play.aws.auth.SimpleAwsCredentials
-import play.api.http.HeaderNames
-import play.api.test.FakeApplication
-import play.api.test.Helpers.running
-import scala.util.Failure
-import scala.util.Success
-import play.api.libs.ws.WS
+import fly.play.s3.acl.CanonicalUser
 import fly.play.s3.acl.FULL_CONTROL
-import fly.play.s3.acl.READ
 import fly.play.s3.acl.Grant
 import fly.play.s3.acl.Group
-import fly.play.s3.acl.CanonicalUser
+import fly.play.s3.acl.READ
+import fly.play.s3.upload.Condition
+import fly.play.s3.upload.Form
+import fly.play.s3.upload.FormElement
+import play.api.http.HeaderNames.CONTENT_TYPE
+import play.api.http.HeaderNames.LOCATION
 import play.api.libs.json.Json
+import play.api.libs.json.Json.toJsFieldJsValueWrapper
+import play.api.libs.ws.WS
+import play.api.test.FakeApplication
+import play.api.test.Helpers.running
+import utils.MultipartFormData
 
 class S3Spec extends Specification {
 
@@ -84,20 +94,7 @@ class S3Spec extends Specification {
       S3.url("s3playlibrary.rhinofly.net", "privateREADME.txt", 1343845068) must_==
         "http://s3playlibrary.rhinofly.net.s3.amazonaws.com/privateREADME.txt?AWSAccessKeyId=AKIAIJJLEMC6OSI2DN2A&Signature=jkbj7%2ByalcC%2Fw%2BKxtMXLIn7b%2Frc%3D&Expires=1343845068"
     }
-    
-    "create an upload policy document" inApp {
-      val policy = S3(testBucketName).policy(
-          "privateREADME.txt",
-          PUBLIC_READ,
-          Json.obj("Content-Type" -> "image/jpeg") :: Json.arr("content-length-range",   0,  10000) :: Nil,
-          15 * 60 * 1000)
-      val conditions = Json.arr(Json.obj("Content-Type" -> "image/jpeg"),
-                                             Json.arr("content-length-range",0,10000),
-                                             Json.obj("bucket" -> "s3playlibrary.rhinofly.net"),
-                                             Json.obj("key" -> "privateREADME.txt"),
-                                             Json.obj("acl" -> "public-read"))
-      (policy \ "conditions") == conditions must beTrue
-    }
+
   }
 
   "Bucket" should {
@@ -145,7 +142,7 @@ class S3Spec extends Specification {
       val result = s3WithCredentials.get(testBucket.name, Some("README.txt"), None, None)
       val value = await(result)
 
-      value.header(HeaderNames.CONTENT_TYPE) must_== Some("text/plain")
+      value.header(CONTENT_TYPE) must_== Some("text/plain")
     }
 
     "be able to check if it exists" inApp {
@@ -326,6 +323,86 @@ class S3Spec extends Specification {
       }
 
       noException(testBucket remove fileName)
+    }
+
+    "be able to supply an uploadPolicy" inApp {
+      val policyBuilder =
+        testBucket.uploadPolicy(new Date)
+          .withConditions(
+            Condition.key eq "privateREADME.txt",
+            Condition.acl eq PUBLIC_READ,
+            Condition.contentLengthRange from 0 to 10000,
+            CONTENT_TYPE -> "image/jpeg")
+
+      val policy = policyBuilder.json
+
+      val expectedConditions = Json.arr(
+        Json.obj("bucket" -> "s3playlibrary.rhinofly.net"),
+        Json.obj("key" -> "privateREADME.txt"),
+        Json.obj("acl" -> "public-read"),
+        Json.arr("content-length-range", 0, 10000),
+        Json.obj(CONTENT_TYPE -> "image/jpeg"))
+      (policy \ "conditions") === expectedConditions
+    }
+
+    "be able to supply an uploadPolicy that can be used to alow browser upload" in {
+      running(fakeApplication(Map("ws.followRedirects" -> false))) {
+
+        val `1 minute from now` = System.currentTimeMillis + (1 * 60 * 1000)
+
+        import Condition._
+        val key = Condition.key
+        val expectedFileName = "test/file.html"
+        val expectedRedirectUrl = "http://fakehost:9000"
+        val expectedTags = "one,two"
+        val expectedContentType = "text/html"
+
+        val policy =
+          testBucket.uploadPolicy(new Date(`1 minute from now`))
+            .withConditions(
+              key startsWith "test/",
+              acl eq PUBLIC_READ,
+              successActionRedirect eq expectedRedirectUrl,
+              header(CONTENT_TYPE) startsWith "text/",
+              meta("tag").any)
+
+        // provide user input
+        val formFieldsFromPolicy =
+          Form(policy).fields
+            .map {
+              case FormElement("key", _, true) =>
+                "key" -> expectedFileName
+              case FormElement("x-amz-meta-tag", _, true) =>
+                "x-amz-meta-tag" -> expectedTags
+              case FormElement(CONTENT_TYPE, _, true) =>
+                CONTENT_TYPE -> expectedContentType
+              case FormElement(name, value, false) =>
+                name -> value
+            }
+
+        val expectedContent = "test text"
+        // file should be the last field
+        val formFields = formFieldsFromPolicy :+ ("file" -> expectedContent)
+
+        val data = MultipartFormData(formFields, "asdfghjkl123")
+
+        val response = await(WS.url(testBucket.url("")).post(data.body))
+
+        response.status === 303
+        response.header(LOCATION).get must startWith(expectedRedirectUrl)
+
+        val bucketFile = await(testBucket.get(expectedFileName))
+
+        bucketFile must beLike {
+          case BucketFile(name, contentType, content, None, headers) =>
+            name === expectedFileName
+            contentType === expectedContentType
+            new String(content) === expectedContent
+            headers.get("x-amz-meta-tag") === expectedTags
+        }
+
+        noException(testBucket remove expectedFileName)
+      }
     }
   }
 }
