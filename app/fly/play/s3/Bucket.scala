@@ -10,6 +10,8 @@ import fly.play.s3.acl.ACLList
 import scala.xml.Elem
 import play.api.libs.json.JsValue
 import play.api.libs.json.JsObject
+import fly.play.s3.upload.PolicyBuilder
+import fly.play.s3.upload.Condition
 
 /**
  * Representation of a bucket
@@ -23,9 +25,6 @@ case class Bucket(
   delimiter: Option[String] = Some("/"),
   s3: S3) {
 
-  //TODO remove this
-  val DEFAULT_DOCUMENT_EXPIRY = 15 * 60 * 1000
-  
   /**
    * Creates an authenticated url for an item with the given name
    *
@@ -34,25 +33,23 @@ case class Bucket(
    */
   def url(itemName: String, expires: Long): String =
     s3.url(name, itemName, ((new Date).getTime / 1000) + expires)
-  
+
   /**
    * Creates an unsigned url for the given item name
-   * 
+   *
    * @param itemName  The item for which the url should be created
    */
-  def url(itemName: String): String = 
+  def url(itemName: String): String =
     s3.url(name, itemName)
-  
+
   /**
-   * Creates an upload policy for the given item name 
-   * 
-   * @param itemName  The item for which the policy should be created
-   * @param conditions sequence of conditions which will apply to the upload policy.
-   * @param expiresIn the number of milliseconds in which this policy will expire
+   * Utility method to create a policy builder for this bucket
+   *
+   * @param expires		The date this policy expires
    */
-  def policy(itemName: String, acl: ACL, conditions: Seq[JsValue], expiresIn: Long = DEFAULT_DOCUMENT_EXPIRY): JsObject = 
-    s3.policy(name, itemName, acl, conditions, expiresIn)
-  
+  def uploadPolicy(expiration: Date): PolicyBuilder =
+    PolicyBuilder(name, expiration)(s3.s3Signer)
+
   /**
    * Retrieves a single item with the given name
    *
@@ -179,7 +176,7 @@ case class Bucket(
 
   /**
    * Updates the ACL of given item
-   * 
+   *
    * @param itemName	The name of file that needs to be updated
    * @param acl			The ACL
    */
@@ -188,12 +185,12 @@ case class Bucket(
 
   /**
    * Retrieves the ACL
-   * 
+   *
    * @param itemName	The name of the file that you want to retrieve the ACL for
-   */    
+   */
   def getAcl(itemName: String): Future[ACLList] =
-    s3.getAcl(name, itemName) map aclListResponse    
-    
+    s3.getAcl(name, itemName) map aclListResponse
+
   private def extractHeaders(response: Response) = {
     for {
       (key, value) <- response.ahcResponse.getHeaders.toMap

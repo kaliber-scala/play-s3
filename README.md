@@ -16,7 +16,7 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "play-s3" % "3.3.2"
+    "nl.rhinofly" %% "play-s3" % "3.3.3"
     // use the following version for play 2.1
     //"nl.rhinofly" %% "play-s3" % "3.1.1"
   )
@@ -167,6 +167,44 @@ for {
     case Grant(FULL_CONTROL, CanonicalUser(id, displayName)) => //...
     case Grant(READ, Group(uri)) => //...
   }
+```
+
+Browser upload helpers:
+
+``` scala
+val `1 minute from now` = System.currentTimeMillis + (1 * 60 * 1000)
+
+// import condition builders
+import fly.play.s3.upload.Condition._
+
+// create a policy and set the conditions
+val policy = 
+  testBucket.uploadPolicy(expiration = new Date(`1 minute from now`)) 
+    .withConditions(
+      key startsWith "test/",
+      acl eq PUBLIC_READ,
+      successActionRedirect eq expectedRedirectUrl,
+      header(CONTENT_TYPE) startsWith "text/",
+      meta("tag").any)
+
+// import Form helper
+import fly.play.s3.upload.Form
+
+val formFieldsFromPolicy = Form(policy).fields
+
+// convert the form fields from the policy to an actial form
+formFieldsFromPolicy
+  .map {
+    case FormElement(name, value, true) =>
+      s"""<input type="text" name="$name" value="$value" />"""
+    case FormElement(name, value, false) =>
+      s"""<input type="hidden" name="$name" value="$value" />"""
+  }
+  
+// make sure you add the file form field as last
+val allFormFields =
+  formFieldsFromPolicy.mkString("\n") +
+  """<input type="text" name="file" />"""
 ```
 
 More examples can be found in the `S3Spec` in the `test` folder. In order to run the tests you need 
