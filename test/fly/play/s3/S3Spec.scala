@@ -3,18 +3,15 @@ package fly.play.s3
 import java.io.File
 import java.lang.IllegalArgumentException
 import java.util.Date
-
 import scala.concurrent.Await
 import scala.concurrent.Awaitable
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 import scala.util.Failure
 import scala.util.Success
-
 import org.specs2.execute.AsResult
 import org.specs2.mutable.Specification
 import org.specs2.specification.Example
-
 import fly.play.aws.auth.SimpleAwsCredentials
 import fly.play.s3.acl.CanonicalUser
 import fly.play.s3.acl.FULL_CONTROL
@@ -32,6 +29,7 @@ import play.api.libs.ws.WS
 import play.api.test.FakeApplication
 import play.api.test.Helpers.running
 import utils.MultipartFormData
+import java.net.URLEncoder
 
 class S3Spec extends Specification {
 
@@ -403,6 +401,28 @@ class S3Spec extends Specification {
 
         noException(testBucket remove expectedFileName)
       }
+
+    }
+
+    "be able to add and delete files with 'weird' names" inApp {
+
+      def uploadListAndRemoveFileWithName(prefix:String, name: String) = {
+        await(testBucket + BucketFile(URLEncoder.encode(prefix + name, "UTF-8"), "text/plain", "test".getBytes))
+
+        await(testBucket.list(prefix)) must beLike {
+          case Seq(BucketItem(itemName, false)) => itemName === (prefix + name)
+        }
+
+        await(testBucket - URLEncoder.encode(prefix + name, "UTF-8"))
+
+        success
+      }
+
+      uploadListAndRemoveFileWithName("sample/", "test file.txt")
+      uploadListAndRemoveFileWithName("sample/", "test&;-file.txt")
+      uploadListAndRemoveFileWithName("sample/", "test & file.txt")
+      uploadListAndRemoveFileWithName("sample/", "test+&+file.txt")
     }
   }
+
 }
