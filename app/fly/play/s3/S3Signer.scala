@@ -3,7 +3,6 @@ package fly.play.s3
 import java.net.URI
 import java.security.MessageDigest
 import java.util.Date
-
 import fly.play.aws.Aws.dates.rfc822DateFormat
 import fly.play.aws.auth.AwsCredentials
 import fly.play.aws.auth.Signer
@@ -13,6 +12,7 @@ import javax.crypto.spec.SecretKeySpec
 import play.api.http.ContentTypeOf
 import play.api.http.Writeable
 import play.api.libs.ws.WS
+import java.net.URL
 
 case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer with SignerUtils {
   private val AwsCredentials(accessKeyId, secretKey, sessionToken, expirationSeconds) = credentials
@@ -47,8 +47,8 @@ case class S3Signer(credentials: AwsCredentials, s3Host: String) extends Signer 
 
     var newHeaders = addHeaders(request.headers, dateTime, contentType, contentMd5)
 
-    val uri = URI.create(request.url)
-    var path = uri.getPath match {
+    val uri = new URL(request.url)
+    val path = uri.getPath match {
       case "" | null => None
       case path => Some(path)
     }
