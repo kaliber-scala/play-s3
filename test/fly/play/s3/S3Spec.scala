@@ -89,8 +89,9 @@ class S3Spec extends Specification {
     }
 
     "create the correct url" inApp {
+      implicit val credentials = SimpleAwsCredentials("test", "test")
       S3.url("s3playlibrary.rhinofly.net", "privateREADME.txt", 1343845068) must_==
-        "http://s3playlibrary.rhinofly.net.s3.amazonaws.com/privateREADME.txt?AWSAccessKeyId=AKIAIJJLEMC6OSI2DN2A&Signature=jkbj7%2ByalcC%2Fw%2BKxtMXLIn7b%2Frc%3D&Expires=1343845068"
+        "http://s3playlibrary.rhinofly.net.s3.amazonaws.com/privateREADME.txt?AWSAccessKeyId=test&Signature=FCUeFIgwLzBdtutUF4mvxARPOMA%3D&Expires=1343845068"
     }
 
   }
