@@ -1,11 +1,14 @@
 package fly.play.s3
 
 import scala.concurrent.Future
-
 import fly.play.aws.Aws
 import fly.play.aws.auth.AwsCredentials
 import play.api.http.ContentTypeOf
 import play.api.libs.ws.Response
+import scala.concurrent.duration._
+import scala.collection.mutable.StringBuilder
+import scala.collection.immutable.TreeMap
+import scala.collection.SortedMap
 
 /**
  * Amazon Simple Storage Service
@@ -41,10 +44,24 @@ object S3 {
 
   /**
    * Utility method to create an url
+   * @param bucketName	The name of the bucket
+   * @param expires		Absolute time in seconds since epoch at which to expire the link
+   * @param httpVerb	The HTTP method approved by the signed URL
+   * @param headers		Any headers that may need to be included, unneeded headers will be ignored
    */
-  def url(bucketName: String, path: String, expires: Long)(implicit credentials: AwsCredentials) =
-    fromConfig.url(bucketName, path, expires)
+  def url(bucketName: String, path: String, expires: Long, httpVerb: String = "GET", headers: Map[String, String] = Map.empty)(implicit credentials: AwsCredentials) =
+    fromConfig.url(bucketName, path, expires, httpVerb, headers)
 
+  /**
+   * Utility method to create an url
+   * @param bucketName	The name of the bucket
+   * @param expires		Time since "now" to expire at, rounded down to the closest second
+   * @param httpVerb	The HTTP method approved by the signed URL
+   * @param headers		Any headers that may need to be included, unneeded headers will be ignored
+   */
+  def durationalUrl(bucketName: String, path: String, expires: Duration, httpVerb: String = "GET", headers: Map[String, String] = Map.empty)(implicit credentials: AwsCredentials): String =
+    fromConfig.durationalUrl(bucketName, path, expires, httpVerb, headers)
+        
 }
 
 class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCredentials) {
@@ -145,26 +162,93 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
       .url(httpUrl(bucketName, path))
       .delete
 
+  lazy val headerOrder = Ordering.fromLessThan[String]((a, b) => a.compareToIgnoreCase(b) == -1)
+  lazy val headerTrimmer = """\n(\\s+|\\t)""".r
+
   /**
-   * Lowlevel method to create an authenticated url to a specific file
-   *
+   * Lowlevel method to create an authenticated url to a specific file, with options to configure for method and extra data.
    * @param bucketName	The name of the bucket
    * @param path		The path of the file you want to delete
-   * @param expires		Time in seconds since epoch
-   *
-   * @see Bucket.url
+   * @param expires		Absolute time in seconds since epoch at which to expire the link
+   * @param httpVerb	The HTTP method approved by the signed URL
+   * @param headers		Any headers that may need to be included, unneeded headers will be ignored and case-dependant duplicates will cause an error
    */
-  def url(bucketName: String, path: String, expires: Long): String = {
+  def url(bucketName: String, path: String, expires: Long, httpVerb: String, headers: Map[String, String]): String = {
+    import play.api.http.HeaderNames._
+    
+    
+    val sortedHeaders = headers match {
+      case sorted: SortedMap[String, String] => sorted
+      case _ => (SortedMap.empty: SortedMap[String, String]) ++ headers
+    }
+
+    // Prepare the headers for case-insensitive processing    
+    val ciHeaders = sortedHeaders.map { entry =>
+      (entry._1.toLowerCase, entry._2)
+    }
+
     val expireString = expires.toString
 
-    val cannonicalRequest = "GET\n\n\n" + expireString + "\n/" + bucketName + "/" + path
-    val signature = s3Signer.createSignature(cannonicalRequest)
+    // To ensure accuracy - including Amazon spec
+    // StringToSign =
+    val stringToSign = new StringBuilder(1024)
+
+    // HTTP-VERB + "\n"
+    stringToSign.append(httpVerb)
+    stringToSign.append('\n')
+
+    // Content-MD5 + "\n"
+    stringToSign.append(ciHeaders.getOrElse(CONTENT_MD5.toLowerCase, ""))
+    stringToSign.append('\n')
+
+    // Content-Type + "\n"
+    stringToSign.append(ciHeaders.getOrElse(CONTENT_TYPE.toLowerCase, ""))
+    stringToSign.append('\n')
+
+    // Expires + "\n"
+    stringToSign.append(expireString)
+    stringToSign.append('\n')
+
+    // Get the Amazon headers - in order
+    for { header <- ciHeaders if (header._1.startsWith("x-amz-")) } {
+      // 1. Convert each HTTP header name to lowercase (DONE for ciHeaders)
+      // 2. Sort lexicographically by header name (DONE for ciHeaders - Sorted Map)
+
+      // 3. Unwrap long headers with a single space separating each line
+      val consolidatedValue = headerTrimmer.replaceAllIn(header._2, " ")
+
+      // 4-6 Append without a space and with a trailing newline
+      stringToSign.append(header)
+      stringToSign.append(':')
+      stringToSign.append(consolidatedValue)
+      stringToSign.append('\n')
+    }
+    
+    // Cannonicalized Resource
+    stringToSign.append('/')
+    stringToSign.append(bucketName)
+    stringToSign.append('/')
+    stringToSign.append(path)
+
+    val signature = s3Signer.createSignature(stringToSign.toString)
 
     httpUrl(bucketName, path) +
       "?AWSAccessKeyId=" + credentials.accessKeyId +
       "&Signature=" + s3Signer.urlEncode(signature) +
       "&Expires=" + expireString
   }
+  
+  
+  /**
+   * Lowlevel method to create an url
+   * @param bucketName	The name of the bucket
+   * @param expires		Time since "now" to expire at, rounded down to the closest second
+   * @param httpVerb	The HTTP method approved by the signed URL
+   * @param headers		Any headers that may need to be included, unneeded headers will be ignored
+   */
+  def durationalUrl(bucketName: String, path: String, expires: Duration, httpVerb: String = "GET", headers: Map[String, String] = Map.empty)(implicit credentials: AwsCredentials): String =
+    url(bucketName, path, (System.currentTimeMillis.milliseconds + expires).toSeconds, httpVerb, headers)
+  
   
   /**
    * creates an unsigned url to the specified file and bucket

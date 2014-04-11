@@ -12,6 +12,7 @@ import play.api.libs.json.JsValue
 import play.api.libs.json.JsObject
 import fly.play.s3.upload.PolicyBuilder
 import fly.play.s3.upload.Condition
+import scala.concurrent.duration._
 
 /**
  * Representation of a bucket
@@ -30,9 +31,23 @@ case class Bucket(
    *
    * @param itemName	The item for which the url should be created
    * @param expires		The expiration in seconds from now
+   * @param httpVerb	The HTTP method approved by the signed URL
+   * @param headers		Any headers that may need to be included, unneeded headers will be ignored
    */
-  def url(itemName: String, expires: Long): String =
-    s3.url(name, itemName, ((new Date).getTime / 1000) + expires)
+  def url(itemName: String, expires: Long, httpVerb: String = "GET", headers: Map[String, String] = Map.empty): String =
+    s3.url(name, itemName, expires, httpVerb, headers)
+    
+    
+  /**
+   * Creates an authenticated url for an item with the given name
+   * @param itemName	The item for which the url should be created
+   * @param expires		Time since "now" to expire at, rounded down to the closest second
+   * @param httpVerb	The HTTP method approved by the signed URL
+   * @param headers		Any headers that may need to be included, unneeded headers will be ignored
+   */
+  def durationalUrl(itemName: String, expires: Duration, httpVerb: String = "GET", headers: Map[String, String] = Map.empty): String =
+    s3.durationalUrl(name, itemName, expires, httpVerb, headers)
+    
 
   /**
    * Creates an unsigned url for the given item name
