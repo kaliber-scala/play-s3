@@ -26,6 +26,8 @@ case class Bucket(
   delimiter: Option[String] = Some("/"),
   s3: S3) {
 
+  val maxItems = 1000
+
   /**
    * Creates an authenticated url for an item with the given name
    *
@@ -76,8 +78,13 @@ case class Bucket(
   /**
    * Lists the contents of a 'directory' in the bucket
    */
-  def list(prefix: String): Future[Iterable[BucketItem]] = {
-    s3.get(name, None, Some(prefix), delimiter, None, None) map listResponse
+  def list(prefix: String, lastItem: Option[String] = None): Future[Iterable[BucketItem]] = {
+    for {
+      result <- s3.get(name, None, Some(prefix), delimiter, lastItem, None) map listResponse
+      next <- list(prefix, Some(result.last.name)) if (result.size >= maxItems)
+    } yield {
+      result ++: next
+    }
   }
     
   /**
