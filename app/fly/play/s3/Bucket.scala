@@ -4,6 +4,7 @@ import java.util.Date
 import scala.collection.JavaConversions.asScalaBuffer
 import scala.collection.JavaConversions.mapAsScalaMap
 import scala.concurrent.Future
+import scala.concurrent.Promise
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.ws.Response
 import fly.play.s3.acl.ACLList
@@ -56,7 +57,7 @@ case class Bucket(
    * @param itemName	The name of the item you want to retrieve
    */
   def get(itemName: String): Future[BucketFile] =
-    s3.get(name, Some(itemName), None, None) map S3Response { (status, response) =>
+    s3.get(name, Some(itemName), None, None, None, None) map S3Response { (status, response) =>
       val headers = extractHeaders(response)
 
       BucketFile(itemName,
@@ -70,13 +71,18 @@ case class Bucket(
    * Lists the contents of the bucket
    */
   def list: Future[Iterable[BucketItem]] =
-    s3.get(name, None, None, delimiter) map listResponse
+    s3.get(name, None, None, delimiter, None, None) map listResponse
 
   /**
    * Lists the contents of a 'directory' in the bucket
    */
-  def list(prefix: String): Future[Iterable[BucketItem]] =
-    s3.get(name, None, Some(prefix), delimiter) map listResponse
+  def list(prefix: String): Future[Iterable[BucketItem]] = {
+    s3.get(name, None, Some(prefix), delimiter, None, None) map listResponse
+  }
+    
+  /**
+   * Lists contents of a 'directory' in the bucket, and awaits for more items if it has more items.
+   */
 
   /**
    * @see add

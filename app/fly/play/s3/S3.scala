@@ -120,17 +120,28 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
    * 					This is mostly used to retrieve single files
    * @param prefix		A prefix that is most commonly used to list the contents of a 'directory'
    * @param delimiter	A delimiter that is used to distinguish 'directories'
-   *
+   * @param marker      A marker of the last item retrieved from a subsequent request.  Used to get a bucket
+   *                      that has more than 1000 items, as this is the max Amazon will return per request.  The returns
+   *                      are in lexicographic (alphabetical) order.  See the following:
+   *                      http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketGET.html
+   * @param maxKeys     Maximum amount of items to return.  It will never be greater than this, but could be less.  
+   *                      The max amazon allows is 1000 items per request.
+   * 
    * @see Bucket.get
    * @see Bucket.list
    */
-  def get(bucketName: String, path: Option[String], prefix: Option[String], delimiter: Option[String]): Future[Response] =
-    awsWithSigner
+  def get(bucketName: String, path: Option[String], prefix: Option[String], delimiter: Option[String], 
+      marker: Option[String], maxKeys: Option[String]): Future[Response] = {
+    val response = awsWithSigner
       .url(httpUrl(bucketName, path.getOrElse("")))
       .withQueryString(
         (prefix.map("prefix" -> _).toList :::
-          delimiter.map("delimiter" -> _).toList): _*)
+          delimiter.map("delimiter" -> _).toList :::
+          marker.map("marker" -> _).toList :::
+          maxKeys.map("max-keys" -> _).toList): _*)
       .get
+      response
+  }
 
   /**
    * Lowlevel method to call delete on a bucket in order to delete a file

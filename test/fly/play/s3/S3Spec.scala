@@ -138,7 +138,7 @@ class S3Spec extends Specification {
 
     "with the correct mime type" inApp {
 
-      val result = s3WithCredentials.get(testBucket.name, Some("README.txt"), None, None)
+      val result = s3WithCredentials.get(testBucket.name, Some("README.txt"), None, None, None, None)
       val value = await(result)
 
       value.header(CONTENT_TYPE) must_== Some("text/plain")
