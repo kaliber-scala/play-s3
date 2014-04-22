@@ -56,7 +56,7 @@ case class Bucket(
    * @param itemName	The name of the item you want to retrieve
    */
   def get(itemName: String): Future[BucketFile] =
-    s3.get(name, Some(itemName), None, None) map S3Response { (status, response) =>
+    s3.get(name, Some(itemName), None, None, None) map S3Response { (status, response) =>
       val headers = extractHeaders(response)
 
       BucketFile(itemName,
@@ -70,13 +70,25 @@ case class Bucket(
    * Lists the contents of the bucket
    */
   def list: Future[Iterable[BucketItem]] =
-    s3.get(name, None, None, delimiter) map listResponse
+    list(None)
 
   /**
    * Lists the contents of a 'directory' in the bucket
    */
   def list(prefix: String): Future[Iterable[BucketItem]] =
-    s3.get(name, None, Some(prefix), delimiter) map listResponse
+    list(Some(prefix))
+
+  private def list(prefix: Option[String]): Future[Iterable[BucketItem]] = {
+
+    def listWithMarker(marker: Option[String], accum: Seq[BucketItem]): Future[Iterable[BucketItem]] =
+      s3.get(name, None, prefix, delimiter, marker) map
+        listResponse flatMap {
+          case ListResponse(elems, None) => Future.successful(accum ++ elems)
+          case ListResponse(elems, next) => listWithMarker(next, accum ++ elems)
+        }
+
+    listWithMarker(None, Seq.empty)
+  }
 
   /**
    * @see add
@@ -198,12 +210,26 @@ case class Bucket(
     } yield key -> value.head
   }
 
+  private case class ListResponse(items: Seq[BucketItem], nextMarker: Option[String])
+
   private def listResponse =
     S3Response { (status, response) =>
       val xml = response.xml
 
-      /* files */ (xml \ "Contents").map(n => BucketItem((n \ "Key").text, false)) ++
-        /* folders */ (xml \ "CommonPrefixes").map(n => BucketItem((n \ "Prefix").text, true))
+      val isTruncated = (xml \ "IsTruncated").text == "true"
+
+      var items = /* files */ (xml \ "Contents").map(n => BucketItem((n \ "Key").text, false))
+      if (delimiter.isDefined)
+        items ++= /* folders */ (xml \ "CommonPrefixes").map(n => BucketItem((n \ "Prefix").text, true))
+
+      val nextMarker =
+        if (isTruncated)
+          if (delimiter.isDefined)
+            Some((xml \ "NextMarker").text)
+          else items.lastOption.map(_.name)
+        else None
+
+      ListResponse(items, nextMarker)
     } _
 
   private def aclListResponse =

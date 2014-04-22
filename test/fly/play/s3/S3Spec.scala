@@ -2,16 +2,22 @@ package fly.play.s3
 
 import java.io.File
 import java.lang.IllegalArgumentException
+import java.net.URLEncoder
 import java.util.Date
+
 import scala.concurrent.Await
 import scala.concurrent.Awaitable
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
+import scala.concurrent.duration.DurationInt
 import scala.util.Failure
 import scala.util.Success
+
 import org.specs2.execute.AsResult
 import org.specs2.mutable.Specification
 import org.specs2.specification.Example
+import org.specs2.time.NoTimeConversions
+
 import fly.play.aws.auth.SimpleAwsCredentials
 import fly.play.s3.acl.CanonicalUser
 import fly.play.s3.acl.FULL_CONTROL
@@ -23,15 +29,14 @@ import fly.play.s3.upload.Form
 import fly.play.s3.upload.FormElement
 import play.api.http.HeaderNames.CONTENT_TYPE
 import play.api.http.HeaderNames.LOCATION
+import play.api.libs.concurrent.Execution.Implicits.{defaultContext => playContext}
 import play.api.libs.json.Json
-import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.libs.ws.WS
 import play.api.test.FakeApplication
 import play.api.test.Helpers.running
 import utils.MultipartFormData
-import java.net.URLEncoder
 
-class S3Spec extends Specification {
+class S3Spec extends Specification with NoTimeConversions {
 
   sequential
 
@@ -50,7 +55,7 @@ class S3Spec extends Specification {
   def s3WithCredentials = S3.fromConfig
 
   def await[T](a: Awaitable[T]): T =
-    Await.result(a, Duration.Inf)
+    Await.result(a, 120.seconds)
 
   def noException[T](a: Awaitable[T]) =
     await(a) must not(throwA[Throwable])
@@ -138,7 +143,7 @@ class S3Spec extends Specification {
 
     "with the correct mime type" inApp {
 
-      val result = s3WithCredentials.get(testBucket.name, Some("README.txt"), None, None)
+      val result = s3WithCredentials.get(testBucket.name, Some("README.txt"), None, None, None)
       val value = await(result)
 
       value.header(CONTENT_TYPE) must_== Some("text/plain")
@@ -326,7 +331,7 @@ class S3Spec extends Specification {
 
     "be able to supply an uploadPolicy" inApp {
       val policyBuilder =
-        testBucket.uploadPolicy(new Date)
+        testBucket.uploadPolicy(new Date())
           .withConditions(
             Condition.key eq "privateREADME.txt",
             Condition.acl eq PUBLIC_READ,
@@ -407,7 +412,7 @@ class S3Spec extends Specification {
 
     "be able to add and delete files with 'weird' names" inApp {
 
-      def uploadListAndRemoveFileWithName(prefix:String, name: String) = {
+      def uploadListAndRemoveFileWithName(prefix: String, name: String) = {
         await(testBucket + BucketFile(URLEncoder.encode(prefix + name, "UTF-8"), "text/plain", "test".getBytes))
 
         await(testBucket.list(prefix)) must beLike {
@@ -424,6 +429,57 @@ class S3Spec extends Specification {
       uploadListAndRemoveFileWithName("sample/", "test & file.txt")
       uploadListAndRemoveFileWithName("sample/", "test+&+file.txt")
     }
-  }
 
+    "be able to list contents greater than 1000 items" inApp {
+      def batched[T, R](amount: Int, s: Seq[T])(f: T => Future[R]): Future[Seq[R]] =
+        s.grouped(amount)
+          .foldLeft(Future.successful(Seq.empty[R])) { (acc, elems) =>
+            acc.flatMap { results =>
+              Future.sequence(elems.map(f))
+                .map(results ++ _)
+                .map { r => print('-'); r }
+            }
+          }
+
+      val sizeBeforeAddingItems = await(testBucket.list).size
+      val amount = 1100
+
+      def fileName(number: Int) = s"README-$number.txt"
+
+      print("creating files: ")
+      val createdFileNames = {
+        val exampleFile = BucketFile(fileName(0), "text/plain", "Many files example".getBytes)
+        val exampleStored = testBucket + exampleFile
+        exampleStored.flatMap { _ =>
+
+          batched(40, 1 to amount) { number =>
+            val name = fileName(number)
+
+            S3.fromConfig
+              .putCopy(testBucketName, exampleFile.name, testBucketName, name, PUBLIC_READ)
+              .map { _ =>
+                name
+              }
+          }
+        }
+      }
+      val fileNames = await(createdFileNames)
+      print("\n")
+
+      await(testBucket.remove(fileName(0)))
+      val filesAvailable1 = await(testBucket.list)
+
+      val bucketWithoutDelimiter = testBucket.withDelimiter(None)
+
+      val filesAvailable2 = await(bucketWithoutDelimiter.list)
+
+      print("removing files: ")
+      val removedFiles = batched(40, fileNames)(testBucket.remove)
+      await(removedFiles)
+      print("\n")
+
+      filesAvailable1.size === sizeBeforeAddingItems + amount
+      filesAvailable2.size === sizeBeforeAddingItems + amount
+    }
+  }
 }

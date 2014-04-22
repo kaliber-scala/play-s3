@@ -96,7 +96,7 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
       .withHeaders("X-Amz-acl" -> acl.value :: headers: _*)
       .put(bucketFile.content)
   }
-  
+
   def putAcl(bucketName: String, sourcePath: String, acl: ACL): Future[Response] = {
     awsWithSigner
       .url(httpUrl(bucketName, sourcePath))
@@ -104,32 +104,39 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
       .withHeaders("X-Amz-acl" -> acl.value)
       .put
   }
-  
+
   def getAcl(bucketName: String, sourcePath: String): Future[Response] = {
     awsWithSigner
       .url(httpUrl(bucketName, sourcePath))
       .withQueryString("acl" -> "")
       .get
-  }  
+  }
 
   /**
    * Lowlevel method to call get on a bucket or a specific file
    *
-   * @param bucketName	The name of the bucket
-   * @param path		The path that you want to call the get on, default is "" (empty string).
-   * 					This is mostly used to retrieve single files
-   * @param prefix		A prefix that is most commonly used to list the contents of a 'directory'
-   * @param delimiter	A delimiter that is used to distinguish 'directories'
+   * @param bucketName  The name of the bucket
+   * @param path        The path that you want to call the get on, default is "" (empty string).
+   *                    This is mostly used to retrieve single files
+   * @param prefix      A prefix that is most commonly used to list the contents of a 'directory'
+   * @param delimiter   A delimiter that is used to distinguish 'directories'
+   * @param marker      A marker of the last item retrieved from a subsequent request.  Used to get a bucket
+   *                    that has more than 1000 items, as this is the max Amazon will return per request.
+   *                    The returns are in lexicographic (alphabetical) order.  See the following:
+   *                    http://docs.aws.amazon.com/AmazonS3/latest/API/RESTBucketGET.html
    *
    * @see Bucket.get
    * @see Bucket.list
    */
-  def get(bucketName: String, path: Option[String], prefix: Option[String], delimiter: Option[String]): Future[Response] =
+  def get(bucketName: String, path: Option[String], prefix: Option[String],
+    delimiter: Option[String], marker: Option[String]): Future[Response] =
+
     awsWithSigner
       .url(httpUrl(bucketName, path.getOrElse("")))
       .withQueryString(
         (prefix.map("prefix" -> _).toList :::
-          delimiter.map("delimiter" -> _).toList): _*)
+          delimiter.map("delimiter" -> _).toList :::
+          marker.map("marker" -> _).toList): _*)
       .get
 
   /**
@@ -165,14 +172,14 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
       "&Signature=" + s3Signer.urlEncode(signature) +
       "&Expires=" + expireString
   }
-  
+
   /**
    * creates an unsigned url to the specified file and bucket
-   * 
+   *
    * @param bucketName the name of the bucket
    * @param path the path of the file we want to create a url for
    */
-  def url(bucketName: String, path: String): String = 
+  def url(bucketName: String, path: String): String =
     httpUrl(bucketName, path)
 
   /**
