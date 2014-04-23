@@ -74,10 +74,13 @@ case class Bucket(
   def list: Future[Iterable[BucketItem]] = list("")
 
   /**
-   * Lists the contents of a 'directory' in the bucket
+   * Lists the contents of a 'directory' in the bucket, using the prefix as the path
    * Thanks to:
    *   http://stackoverflow.com/questions/23233049/scala-nosuchelementexception-in-for-comprehension 
    * for the help
+   * 
+   * @param prefix		Bucket prefix
+   * 
    */
   def list(prefix: String, lastItem: Option[String] = None, accum: Seq[BucketItem] = Vector()): Future[Iterable[BucketItem]] = {
     s3.get(name, None, Some(prefix), delimiter, lastItem, None) map listResponse flatMap { current =>
@@ -87,10 +90,6 @@ case class Bucket(
         list(prefix, Some(current.last.name), accum ++ current)
     }
   }
-    
-  /**
-   * Lists contents of a 'directory' in the bucket, and awaits for more items if it has more items.
-   */
 
   /**
    * @see add
