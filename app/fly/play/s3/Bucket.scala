@@ -73,11 +73,13 @@ case class Bucket(
   /**
    * Lists the contents of the bucket
    */
-  def list: Future[Iterable[BucketItem]] =
-    s3.get(name, None, None, delimiter, None, None) map listResponse
+  def list: Future[Iterable[BucketItem]] = list("")
 
   /**
    * Lists the contents of a 'directory' in the bucket
+   * Thanks to:
+   *   http://stackoverflow.com/questions/23233049/scala-nosuchelementexception-in-for-comprehension 
+   * for the help
    */
   def list(prefix: String, lastItem: Option[String] = None, accum: Seq[BucketItem] = Vector()): Future[Iterable[BucketItem]] = {
     s3.get(name, None, Some(prefix), delimiter, lastItem, None) map listResponse flatMap { current =>
