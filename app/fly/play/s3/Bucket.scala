@@ -13,6 +13,7 @@ import play.api.libs.json.JsValue
 import play.api.libs.json.JsObject
 import fly.play.s3.upload.PolicyBuilder
 import fly.play.s3.upload.Condition
+import play.api.Logger
 
 /**
  * Representation of a bucket
@@ -26,7 +27,7 @@ case class Bucket(
   delimiter: Option[String] = Some("/"),
   s3: S3) {
 
-  val maxItems = 1000
+  val MAX_ITEMS = 1000
 
   /**
    * Creates an authenticated url for an item with the given name
@@ -78,12 +79,12 @@ case class Bucket(
   /**
    * Lists the contents of a 'directory' in the bucket
    */
-  def list(prefix: String, lastItem: Option[String] = None): Future[Iterable[BucketItem]] = {
-    for {
-      result <- s3.get(name, None, Some(prefix), delimiter, lastItem, None) map listResponse
-      next <- list(prefix, Some(result.last.name)) if (result.size >= maxItems)
-    } yield {
-      result ++: next
+  def list(prefix: String, lastItem: Option[String] = None, accum: Seq[BucketItem] = Vector()): Future[Iterable[BucketItem]] = {
+    s3.get(name, None, Some(prefix), delimiter, lastItem, None) map listResponse flatMap { current =>
+      if (current.isEmpty)
+        Future.successful(accum)
+      else
+        list(prefix, Some(current.last.name), accum ++ current)
     }
   }
     
