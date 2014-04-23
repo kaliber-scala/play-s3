@@ -424,6 +424,22 @@ class S3Spec extends Specification {
       uploadListAndRemoveFileWithName("sample/", "test & file.txt")
       uploadListAndRemoveFileWithName("sample/", "test+&+file.txt")
     }
-  }
 
+    "list should be able to list contents greater than 1000 items" inApp {
+      val curr = await(testBucket.list).size
+      val ITEMS = 1100
+      def populateFiles(items: Integer) = {
+        1 to items foreach { number =>
+          testBucket + BucketFile(s"README-$number.txt", "text/plain", """
+		        This is a bucket used for testing the S3 module of play
+		        """.getBytes)
+        }
+      }
+      populateFiles(ITEMS)
+      val result = testBucket.list
+      val value = await(result)
+      value.size === curr + ITEMS
+    }
+
+  }
 }
