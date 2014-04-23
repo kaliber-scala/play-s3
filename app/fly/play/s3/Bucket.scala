@@ -4,7 +4,6 @@ import java.util.Date
 import scala.collection.JavaConversions.asScalaBuffer
 import scala.collection.JavaConversions.mapAsScalaMap
 import scala.concurrent.Future
-import scala.concurrent.Promise
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.ws.Response
 import fly.play.s3.acl.ACLList
@@ -13,7 +12,6 @@ import play.api.libs.json.JsValue
 import play.api.libs.json.JsObject
 import fly.play.s3.upload.PolicyBuilder
 import fly.play.s3.upload.Condition
-import play.api.Logger
 
 /**
  * Representation of a bucket
