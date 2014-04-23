@@ -25,6 +25,8 @@ case class Bucket(
   delimiter: Option[String] = Some("/"),
   s3: S3) {
 
+  val MAX_ITEMS = 1000
+
   /**
    * Creates an authenticated url for an item with the given name
    *
@@ -56,7 +58,7 @@ case class Bucket(
    * @param itemName	The name of the item you want to retrieve
    */
   def get(itemName: String): Future[BucketFile] =
-    s3.get(name, Some(itemName), None, None) map S3Response { (status, response) =>
+    s3.get(name, Some(itemName), None, None, None, None) map S3Response { (status, response) =>
       val headers = extractHeaders(response)
 
       BucketFile(itemName,
@@ -69,14 +71,25 @@ case class Bucket(
   /**
    * Lists the contents of the bucket
    */
-  def list: Future[Iterable[BucketItem]] =
-    s3.get(name, None, None, delimiter) map listResponse
+  def list: Future[Iterable[BucketItem]] = list("")
 
   /**
-   * Lists the contents of a 'directory' in the bucket
+   * Lists the contents of a 'directory' in the bucket, using the prefix as the path
+   * Thanks to:
+   *   http://stackoverflow.com/questions/23233049/scala-nosuchelementexception-in-for-comprehension 
+   * for the help
+   * 
+   * @param prefix		Bucket prefix
+   * 
    */
-  def list(prefix: String): Future[Iterable[BucketItem]] =
-    s3.get(name, None, Some(prefix), delimiter) map listResponse
+  def list(prefix: String, lastItem: Option[String] = None, accum: Seq[BucketItem] = Vector()): Future[Iterable[BucketItem]] = {
+    s3.get(name, None, Some(prefix), delimiter, lastItem, None) map listResponse flatMap { current =>
+      if (current.isEmpty)
+        Future.successful(accum)
+      else
+        list(prefix, Some(current.last.name), accum ++ current)
+    }
+  }
 
   /**
    * @see add
