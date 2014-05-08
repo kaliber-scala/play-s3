@@ -305,7 +305,7 @@ class S3Spec extends Specification with NoTimeConversions {
 
     "be able to complete a multipart upload" inApp {
       val fileName = "test-multipart-file.txt"
-      val fileContentType = "text/plain"
+      val fileContentType = "custom/type"
       val partContent: Array[Byte] = Array.fill(100)(0)
 
       val bucketFile = BucketFile(fileName, fileContentType)
