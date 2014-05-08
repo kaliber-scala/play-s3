@@ -55,16 +55,20 @@ case class Bucket(
    *
    * @param itemName	The name of the item you want to retrieve
    */
-  def get(itemName: String): Future[BucketFile] =
-    s3.get(name, Some(itemName), None, None) map S3Response { (status, response) =>
-      val headers = extractHeaders(response)
+  def get(itemName: String, headersOnly: Boolean = false): Future[BucketFile] = {
+    val request = if (headersOnly) s3.head(name, Some(itemName), None, None)
+                  else s3.get(name, Some(itemName), None, None)
+    request map S3Response {
+      (status, response) =>
+        val headers = extractHeaders(response)
 
-      BucketFile(itemName,
-        headers("Content-Type"),
-        response.ahcResponse.getResponseBodyAsBytes,
-        None,
-        Some(headers))
+        BucketFile(itemName,
+          headers("Content-Type"),
+          response.ahcResponse.getResponseBodyAsBytes,
+          None,
+          Some(headers))
     }
+  }
 
   /**
    * Lists the contents of the bucket
