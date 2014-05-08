@@ -209,6 +209,8 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
 
     val acl = bucketFile.acl getOrElse PUBLIC_READ
 
+    implicit val fileContentType = ContentTypeOf[String](Some(bucketFile.contentType))
+
     val headers = (bucketFile.headers getOrElse Map.empty).toList
 
     awsWithSigner
