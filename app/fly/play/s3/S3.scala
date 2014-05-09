@@ -132,6 +132,28 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
           delimiter.map("delimiter" -> _).toList): _*)
       .get
 
+
+  /**
+   * Lowlevel method to call get on a bucket or a specific file
+   *
+   * @param bucketName	The name of the bucket
+   * @param path		The path that you want to call the get on, default is "" (empty string).
+   * 					This is mostly used to retrieve single files
+   * @param prefix		A prefix that is most commonly used to list the contents of a 'directory'
+   * @param delimiter	A delimiter that is used to distinguish 'directories'
+   *
+   * @see Bucket.get
+   * @see Bucket.list
+   */
+  def head(bucketName: String, path: Option[String], prefix: Option[String], delimiter: Option[String]): Future[Response] =
+    awsWithSigner
+      .url(httpUrl(bucketName, path.getOrElse("")))
+      .withQueryString(
+        (prefix.map("prefix" -> _).toList :::
+          delimiter.map("delimiter" -> _).toList): _*)
+      .head
+
+
   /**
    * Lowlevel method to call delete on a bucket in order to delete a file
    *
