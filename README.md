@@ -16,11 +16,11 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "play-s3" % "3.3.3"
+    "nl.rhinofly" %% "play-s3" % "3.3.5"
     // use the following version for play 2.1
     //"nl.rhinofly" %% "play-s3" % "3.1.1"
   )
-  
+
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
     resolvers += "Rhinofly Internal Repository" at "http://maven-repository.rhinofly.net:8081/artifactory/libs-release-local"
   )
@@ -36,7 +36,7 @@ aws.accessKeyId=AmazonAccessKeyId
 aws.secretKey=AmazonSecretKey
 ```
 
-If you are using another S3 implementation (like riakCS), you can customize the domain name and 
+If you are using another S3 implementation (like riakCS), you can customize the domain name and
 https usage with these values:
 
 ``` scala
@@ -72,14 +72,14 @@ val result = bucket + BucketFile(fileName, mimeType, byteArray, acl, headers)
 val result = bucket add BucketFile(fileName, mimeType, byteArray, acl, headers)
 
 result
-  .map { unit => 
+  .map { unit =>
     Logger.info("Saved the file")
   }
   .recover {
     case S3Exception(status, code, message, originalXml) => Logger.info("Error: " + message)
   }
 
-```      
+```
 
 Removing a file:
 
@@ -88,20 +88,20 @@ val result = bucket - fileName
 //or
 val result = bucket remove fileName
 
-``` 
+```
 
 Retrieving a file:
 
 ``` scala
 val result = bucket get "fileName"
 
-result.map { 
+result.map {
     case BucketFile(name, contentType, content, acl, headers) => //...
 }
 //or
 val file = Await.result(result, 10 seconds)
 val BucketFile(name, contentType, content, acl, headers) = file
-``` 
+```
 
 Listing the contents of a bucket:
 
@@ -135,15 +135,15 @@ Multipart file upload:
 ``` scala
 
 // Retrieve an upload ticket
-val result:Future[BucketFileUploadTicket] = 
+val result:Future[BucketFileUploadTicket] =
   bucket initiateMultipartUpload BucketFile(fileName, mimeType)
 
 // Upload the parts and save the tickets
-val result:Future[BucketFilePartUploadTicket] = 
+val result:Future[BucketFilePartUploadTicket] =
   bucket uploadPart (uploadTicket, BucketFilePart(partNumber, content))
 
 // Complete the upload using both the upload ticket and the part upload tickets
-val result:Future[Unit] =    
+val result:Future[Unit] =
   bucket completeMultipartUpload (uploadTicket, partUploadTickets)
 
 ```
@@ -162,7 +162,7 @@ val result = testBucket.getAcl("private2README.txt")
 for {
  aclList <- result
  grant <- aclList
-} yield 
+} yield
   grant match {
     case Grant(FULL_CONTROL, CanonicalUser(id, displayName)) => //...
     case Grant(READ, Group(uri)) => //...
@@ -178,8 +178,8 @@ val `1 minute from now` = System.currentTimeMillis + (1 * 60 * 1000)
 import fly.play.s3.upload.Condition._
 
 // create a policy and set the conditions
-val policy = 
-  testBucket.uploadPolicy(expiration = new Date(`1 minute from now`)) 
+val policy =
+  testBucket.uploadPolicy(expiration = new Date(`1 minute from now`))
     .withConditions(
       key startsWith "test/",
       acl eq PUBLIC_READ,
@@ -200,12 +200,12 @@ formFieldsFromPolicy
     case FormElement(name, value, false) =>
       s"""<input type="hidden" name="$name" value="$value" />"""
   }
-  
+
 // make sure you add the file form field as last
 val allFormFields =
   formFieldsFromPolicy.mkString("\n") +
   """<input type="text" name="file" />"""
 ```
 
-More examples can be found in the `S3Spec` in the `test` folder. In order to run the tests you need 
+More examples can be found in the `S3Spec` in the `test` folder. In order to run the tests you need
 an `application.conf` file in the `test/conf` folder containing a valid `aws.accessKeyId` and `aws.secretKey`.
