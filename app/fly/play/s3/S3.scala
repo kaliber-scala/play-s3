@@ -70,8 +70,7 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
 
   private def httpUrl(bucketName: String, path: String) = {
 
-    var protocol = "http"
-    if (https) protocol += "s"
+    val protocol = if (https) "https" else "http"
     // now build all url
     protocol + "://" + bucketName + "." + host + "/" + path
   }
