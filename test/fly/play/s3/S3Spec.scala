@@ -29,7 +29,7 @@ import fly.play.s3.upload.Form
 import fly.play.s3.upload.FormElement
 import play.api.http.HeaderNames.CONTENT_TYPE
 import play.api.http.HeaderNames.LOCATION
-import play.api.libs.concurrent.Execution.Implicits.{defaultContext => playContext}
+import play.api.libs.concurrent.Execution.Implicits.{ defaultContext => playContext }
 import play.api.libs.json.Json
 import play.api.libs.ws.WS
 import play.api.test.FakeApplication
@@ -62,8 +62,10 @@ class S3Spec extends Specification with NoTimeConversions {
 
   "S3" should {
 
-    "have the correct default value for host" inApp {
-      s3WithCredentials.host === "s3.amazonaws.com"
+    "have the correct default value for host" in {
+      running(fakeApplication(Map("s3.host" -> null))) {
+        s3WithCredentials.host === "s3.amazonaws.com"
+      }
     }
 
     "have the correct default value for https" inApp {
@@ -95,8 +97,8 @@ class S3Spec extends Specification with NoTimeConversions {
 
     "create the correct url" inApp {
       implicit val credentials = SimpleAwsCredentials("test", "test")
-      S3.url("s3playlibrary.rhinofly.net", "privateREADME.txt", 1343845068) must_==
-        "http://s3playlibrary.rhinofly.net.s3.amazonaws.com/privateREADME.txt?AWSAccessKeyId=test&Signature=FCUeFIgwLzBdtutUF4mvxARPOMA%3D&Expires=1343845068"
+      S3.url(testBucketName, "privateREADME.txt", 1343845068) must_==
+        s"http://$testBucketName.${S3.host}/privateREADME.txt?AWSAccessKeyId=test&Signature=FCUeFIgwLzBdtutUF4mvxARPOMA%3D&Expires=1343845068"
     }
 
   }
