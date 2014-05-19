@@ -1,9 +1,7 @@
 package fly.play.s3.upload
 
 import java.util.Calendar
-
 import org.specs2.mutable.Specification
-
 import fly.play.aws.Aws.dates.iso8601DateFormat
 import fly.play.aws.auth.SimpleAwsCredentials
 import fly.play.s3.PUBLIC_READ
@@ -22,6 +20,13 @@ import play.api.http.HeaderNames.CONTENT_DISPOSITION
 import play.api.http.HeaderNames.CONTENT_TYPE
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
+import fly.play.aws.auth.Aws4Signer
+import fly.play.aws.auth.SignerUtils
+import fly.play.aws.auth.Signer
+import play.api.libs.ws.WS
+import play.api.http.Writeable
+import fly.play.aws.auth.AwsCredentials
+import fly.play.aws.auth.SimpleAwsCredentials
 
 object PolicyBuilderSpec extends Specification {
   "PolicyBuilder" should {
@@ -58,14 +63,14 @@ object PolicyBuilderSpec extends Specification {
 }
 
 object testData {
-  def signer = S3Signer(SimpleAwsCredentials("test", "test"), "fakehost")
-  
-  def createDate(year:Int, month:Int, day:Int) = {
+  def signer = new S3Signer(SimpleAwsCredentials("fake", "fake"), "fake")
+
+  def createDate(year: Int, month: Int, day: Int) = {
     val calendar = Calendar.getInstance
     calendar.set(year, month, day, 12, 0)
     calendar.getTime
   }
-  
+
   val date = createDate(2007, 12, 1)
 
   def bigPolicy = PolicyBuilder("johnsmith", date)(signer)

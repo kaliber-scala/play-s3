@@ -1,11 +1,15 @@
 package fly.play.s3
 
 import scala.concurrent.Future
-
 import fly.play.aws.Aws
 import fly.play.aws.auth.AwsCredentials
 import play.api.http.ContentTypeOf
 import play.api.libs.ws.Response
+import fly.play.aws.auth.Aws4Signer
+import fly.play.aws.auth.Signer
+import play.api.libs.ws.WS
+import play.api.mvc.WithHeaders
+import play.api.http.Writeable
 
 /**
  * Amazon Simple Storage Service
@@ -17,11 +21,23 @@ object S3 {
 
   def config = play.api.Play.current.configuration
 
+  val regionEndpoints = Map(
+      "us-east-1" -> "s3.amazonaws.com",
+      "us-west-1" -> "s3-us-west-1.amazonaws.com",
+      "us-west-2" -> "s3-us-west-2.amazonaws.com",
+      "eu-west-1" -> "s3-eu-west-1.amazonaws.com",
+      "ap-southeast-1" -> "s3-ap-southeast-1.amazonaws.com",
+      "ap-southeast-2" ->  "s3-ap-southeast-2.amazonaws.com",
+      "ap-northeast-1" -> "s3-ap-northeast-1.amazonaws.com",
+      "sa-east-1" -> "s3-sa-east-1.amazonaws.com"
+  )
+
   def https = config getBoolean "s3.https" getOrElse false
-  def host = config getString "s3.host" getOrElse "s3.amazonaws.com"
+  def host = config getString "s3.host" getOrElse regionEndpoints(region)
+  def region = config getString "s3.region" getOrElse "us-east-1"
 
   def fromConfig(implicit credentials: AwsCredentials) =
-    new S3(https, host)
+    new S3(https, host, region)
 
   /**
    * Utility method to create a bucket.
@@ -42,16 +58,15 @@ object S3 {
   /**
    * Utility method to create an url
    */
-  def url(bucketName: String, path: String, expires: Long)(implicit credentials: AwsCredentials) =
+  def url(bucketName: String, path: String, expires: Int)(implicit credentials: AwsCredentials) =
     fromConfig.url(bucketName, path, expires)
 
 }
 
-class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCredentials) {
+class S3(val https: Boolean, val host: String, val region:String)(implicit val credentials: AwsCredentials) {
 
-  lazy val s3Signer = S3Signer(credentials, host)
-
-  lazy val awsWithSigner = Aws withSigner s3Signer
+  lazy val signer = new S3Signer(credentials, region)
+  lazy val awsWithSigner = Aws withSigner signer
 
   /**
    * Utility method to create a bucket.
@@ -161,16 +176,11 @@ class S3(val https: Boolean, val host: String)(implicit val credentials: AwsCred
    *
    * @see Bucket.url
    */
-  def url(bucketName: String, path: String, expires: Long): String = {
-    val expireString = expires.toString
+  def url(bucketName: String, path: String, expires: Int): String = {
 
-    val cannonicalRequest = "GET\n\n\n" + expireString + "\n/" + bucketName + "/" + path
-    val signature = s3Signer.createSignature(cannonicalRequest)
+    val queryString = Map.empty[String, Seq[String]]
 
-    httpUrl(bucketName, path) +
-      "?AWSAccessKeyId=" + credentials.accessKeyId +
-      "&Signature=" + s3Signer.urlEncode(signature) +
-      "&Expires=" + expireString
+    awsWithSigner.signer.signUrl(url(bucketName, path), expires, queryString)
   }
 
   /**

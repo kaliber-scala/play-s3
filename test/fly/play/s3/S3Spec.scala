@@ -2,9 +2,7 @@ package fly.play.s3
 
 import java.io.File
 import java.lang.IllegalArgumentException
-import java.net.URLEncoder
 import java.util.Date
-
 import scala.concurrent.Await
 import scala.concurrent.Awaitable
 import scala.concurrent.Future
@@ -12,13 +10,12 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.duration.DurationInt
 import scala.util.Failure
 import scala.util.Success
-
 import org.specs2.execute.AsResult
 import org.specs2.mutable.Specification
 import org.specs2.specification.Example
 import org.specs2.time.NoTimeConversions
-
 import fly.play.aws.auth.SimpleAwsCredentials
+import fly.play.aws.auth.UrlEncoder
 import fly.play.s3.acl.CanonicalUser
 import fly.play.s3.acl.FULL_CONTROL
 import fly.play.s3.acl.Grant
@@ -27,20 +24,24 @@ import fly.play.s3.acl.READ
 import fly.play.s3.upload.Condition
 import fly.play.s3.upload.Form
 import fly.play.s3.upload.FormElement
+import play.api.Play.current
 import play.api.http.HeaderNames.CONTENT_TYPE
 import play.api.http.HeaderNames.LOCATION
 import play.api.libs.concurrent.Execution.Implicits.{ defaultContext => playContext }
 import play.api.libs.json.Json
+import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.libs.ws.WS
 import play.api.test.FakeApplication
 import play.api.test.Helpers.running
 import utils.MultipartFormData
+import play.api.Application
 
 class S3Spec extends Specification with NoTimeConversions {
 
   sequential
 
-  val testBucketName = "s3playlibrary.rhinofly.net"
+  def testBucketName(implicit app:Application) =
+    app.configuration.getString("testBucketName").getOrElse(sys.error("Could not find testBucketName in configuration"))
 
   def fakeApplication(additionalConfiguration: Map[String, _ <: Any] = Map.empty) =
     FakeApplication(new File("./test"), additionalConfiguration = additionalConfiguration)
@@ -62,14 +63,20 @@ class S3Spec extends Specification with NoTimeConversions {
 
   "S3" should {
 
-    "have the correct default value for host" in {
-      running(fakeApplication(Map("s3.host" -> null))) {
+    "have the correct default value for host" inApp {
+      running(fakeApplication(Map("s3.host" -> null, "s3.region" -> null))) {
         s3WithCredentials.host === "s3.amazonaws.com"
       }
     }
 
     "have the correct default value for https" inApp {
       s3WithCredentials.https === false
+    }
+
+    "have the correct default value for region" inApp {
+      running(fakeApplication(Map("s3.region" -> null))) {
+        s3WithCredentials.region === "us-east-1"
+      }
     }
 
     "get the correct value for host from the configuration" in {
@@ -81,6 +88,18 @@ class S3Spec extends Specification with NoTimeConversions {
     "get the correct value for https from the configuration" in {
       running(fakeApplication(Map("s3.https" -> true))) {
         s3WithCredentials.https === true
+      }
+    }
+
+    "get the correct default value for region from the configuration" inApp {
+      running(fakeApplication(Map("s3.region" -> "eu-west-1"))) {
+        s3WithCredentials.region === "eu-west-1"
+      }
+    }
+
+    "get the correct default value for host if region is set" inApp {
+      running(fakeApplication(Map("s3.region" -> "eu-west-1", "s3.host" -> null))) {
+        s3WithCredentials.host === "s3-eu-west-1.amazonaws.com"
       }
     }
 
@@ -97,8 +116,11 @@ class S3Spec extends Specification with NoTimeConversions {
 
     "create the correct url" inApp {
       implicit val credentials = SimpleAwsCredentials("test", "test")
-      S3.url(testBucketName, "privateREADME.txt", 1343845068) must_==
-        s"http://$testBucketName.${S3.host}/privateREADME.txt?AWSAccessKeyId=test&Signature=FCUeFIgwLzBdtutUF4mvxARPOMA%3D&Expires=1343845068"
+      val url = S3.url(testBucketName, "privateREADME.txt", 1234)
+      val host = S3.host
+
+      url must startWith(s"http://$testBucketName.$host/privateREADME.txt")
+      url must contain("Expires=1234")
     }
 
   }
@@ -394,6 +416,8 @@ class S3Spec extends Specification with NoTimeConversions {
 
         val response = await(WS.url(testBucket.url("")).post(data.body))
 
+        println(response.body)
+
         response.status === 303
         response.header(LOCATION).get must startWith(expectedRedirectUrl)
 
@@ -415,13 +439,13 @@ class S3Spec extends Specification with NoTimeConversions {
     "be able to add and delete files with 'weird' names" inApp {
 
       def uploadListAndRemoveFileWithName(prefix: String, name: String) = {
-        await(testBucket + BucketFile(URLEncoder.encode(prefix + name, "UTF-8"), "text/plain", "test".getBytes))
+        await(testBucket + BucketFile(UrlEncoder.encodePath(prefix + name), "text/plain", "test".getBytes))
 
         await(testBucket.list(prefix)) must beLike {
           case Seq(BucketItem(itemName, false)) => itemName === (prefix + name)
         }
 
-        await(testBucket - URLEncoder.encode(prefix + name, "UTF-8"))
+        await(testBucket - UrlEncoder.encodePath(prefix + name))
 
         success
       }

@@ -1,17 +1,16 @@
 package fly.play.s3.upload
 
 import java.util.Date
-import play.api.libs.json.Writes
-import play.api.libs.json.JsArray
-import play.api.libs.json.Json
-import play.api.libs.json.JsValue
-import fly.play.s3.ACL
-import fly.play.s3.PUBLIC_READ
-import play.api.http.HeaderNames
-import fly.play.aws.Aws.dates.iso8601DateFormat
+
 import scala.language.implicitConversions
-import fly.play.aws.auth.SignerUtils
+
+import fly.play.aws.Aws.dates.iso8601DateFormat
+import fly.play.s3.ACL
 import fly.play.s3.S3Signer
+import play.api.libs.json.JsValue
+import play.api.libs.json.Json
+import play.api.libs.json.Json.toJsFieldJsValueWrapper
+import play.api.libs.json.Writes
 
 case class PolicyBuilder(expiration: Date, conditions: Seq[Condition] = Seq.empty)(implicit val signer: S3Signer) {
 
@@ -26,15 +25,31 @@ case class PolicyBuilder(expiration: Date, conditions: Seq[Condition] = Seq.empt
   lazy val encoded =
     signer.base64Encode(json.toString.getBytes(signer.DEFAULT_ENCODING))
 
-  lazy val signature =
-    signer.createSignature(encoded)
+  lazy val signature = signer.sign(encoded)
+
+  def withSignerConditions = {
+    val scope = signer.Scope(new Date)
+
+    import Condition.string
+
+    val amzDate = signer.amzDate(scope)
+    val amzAlgorithm = signer.amzAlgorithm
+    val amzCredential = signer.amzCredential(scope)
+
+    implicit def toCondition(p: (String, Seq[String])): Condition = p._1 -> p._2.head
+
+    withConditions(
+      amzAlgorithm,
+      amzCredential,
+      amzDate)
+  }
 
 }
 
 object PolicyBuilder {
 
   def apply(bucketName: String, expiration: Date)(implicit signer: S3Signer): PolicyBuilder =
-    PolicyBuilder(expiration).withConditions(Condition.string("bucket") eq bucketName)
+    new PolicyBuilder(expiration).withConditions(Condition.string("bucket") eq bucketName)
 }
 
 trait Condition {
@@ -96,7 +111,7 @@ object Condition {
     }
 
   val key = string("key")
-  
+
   val successActionRedirect = string("success_action_redirect")
 
   val successActionStatus =
@@ -111,7 +126,7 @@ object Condition {
   val header = string _
 
   def meta(name: String) = string("x-amz-meta-" + name)
-  
+
   def string(name: String): EqBuilder[String] with StartsWithBuilder[String] =
     new EqBuilder[String] with StartsWithBuilder[String] {
       val element = name

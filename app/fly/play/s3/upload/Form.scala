@@ -3,20 +3,26 @@ package fly.play.s3.upload
 /**
  * Utility to convert a policy to fields that can be used to construct a form
  */
-case class Form(policy: PolicyBuilder) {
+case class Form(policyBuilder: PolicyBuilder) {
 
-  lazy val fieldsFromConditions =
+  def fields = {
+    val policy = policyBuilder.withSignerConditions
+    fieldsFromConditionsOf(policy) ++ fieldsFromPolicy(policy)
+  }
+
+  private def fieldsFromConditionsOf(policy: PolicyBuilder) =
     policy.conditions.collect {
       case Eq(name, value) => FormElement(name, value)
       case StartsWith(name, value) => FormElement(name, value, userInput = true)
     }
 
-  lazy val fieldsFromPolicy = Seq(
-    FormElement("AWSAccessKeyId", policy.signer.credentials.accessKeyId),
-    FormElement("Policy", policy.encoded),
-    FormElement("Signature", policy.signature))
+  private def fieldsFromPolicy(policy: PolicyBuilder) = {
+    val (signatureName, Seq(signatureValue)) = policy.signer.amzSignature(policy.signature)
 
-  lazy val fields = fieldsFromConditions ++ fieldsFromPolicy
+    Seq(
+      FormElement("policy", policy.encoded),
+      FormElement(signatureName, signatureValue))
+  }
 }
 
 case class FormElement(name: String, value: String, userInput: Boolean = false)
