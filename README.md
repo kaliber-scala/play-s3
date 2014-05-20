@@ -10,13 +10,17 @@ Amazon Simple Storage Service (S3) module for Play 2.2
 
 A minimal S3 API wrapper. Allows you to list, get, add and remove items from a bucket.
 
+Has some extra features that help with direct upload and authenticated url generation.
+
+**Note: this version uses the new aws 4 signer, this requires you to correctly set the region**
+
 
 Installation
 ------------
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "play-s3" % "3.3.5"
+    "nl.rhinofly" %% "play-s3" % "4.0.0"
     // use the following version for play 2.1
     //"nl.rhinofly" %% "play-s3" % "3.1.1"
   )
@@ -36,11 +40,13 @@ aws.accessKeyId=AmazonAccessKeyId
 aws.secretKey=AmazonSecretKey
 ```
 
-If you are using another S3 implementation (like riakCS), you can customize the domain name and
-https usage with these values:
+If you are hosting in a specific region that can be specified. If you are using another S3
+implementation (like riakCS), you can customize the domain name and https usage with these values:
 
 ``` scala
-#default is s3.amazonaws.com
+#default is us-east-1
+s3.region="eu-west-1"
+#default is determined by the region, see: http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 s3.host="your.domain.name"
 #default is false
 s3.https=true
@@ -208,4 +214,14 @@ val allFormFields =
 ```
 
 More examples can be found in the `S3Spec` in the `test` folder. In order to run the tests you need
-an `application.conf` file in the `test/conf` folder containing a valid `aws.accessKeyId` and `aws.secretKey`.
+an `application.conf` file in the `test/conf` that looks like this:
+
+``` scala
+aws.accessKeyId="..."
+aws.secretKey="..."
+
+s3.region="eu-west-1"
+
+testBucketName=s3playlibrary.rhinofly.net
+```
+

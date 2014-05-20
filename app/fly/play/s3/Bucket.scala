@@ -31,8 +31,8 @@ case class Bucket(
    * @param itemName	The item for which the url should be created
    * @param expires		The expiration in seconds from now
    */
-  def url(itemName: String, expires: Long): String =
-    s3.url(name, itemName, ((new Date).getTime / 1000) + expires)
+  def url(itemName: String, expires: Int): String =
+    s3.url(name, itemName, expires)
 
   /**
    * Creates an unsigned url for the given item name
@@ -48,7 +48,7 @@ case class Bucket(
    * @param expires		The date this policy expires
    */
   def uploadPolicy(expiration: Date): PolicyBuilder =
-    PolicyBuilder(name, expiration)(s3.s3Signer)
+    PolicyBuilder(name, expiration)(s3.signer)
 
   /**
    * Retrieves a single item with the given name
