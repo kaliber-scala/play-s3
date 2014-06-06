@@ -27,7 +27,6 @@ import fly.play.s3.upload.FormElement
 import play.api.Play.current
 import play.api.http.HeaderNames.CONTENT_TYPE
 import play.api.http.HeaderNames.LOCATION
-import play.api.libs.concurrent.Execution.Implicits.{ defaultContext => playContext }
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.libs.ws.WS
@@ -44,7 +43,7 @@ class S3Spec extends Specification with NoTimeConversions {
     app.configuration.getString("testBucketName").getOrElse(sys.error("Could not find testBucketName in configuration"))
 
   def fakeApplication(additionalConfiguration: Map[String, _ <: Any] = Map.empty) =
-    FakeApplication(new File("./test"), additionalConfiguration = additionalConfiguration)
+    FakeApplication(new File("./src/test"), additionalConfiguration = additionalConfiguration)
 
   implicit class InAppExample(s: String) {
     def inApp[T: AsResult](r: => T): Example =
@@ -151,8 +150,8 @@ class S3Spec extends Specification with NoTimeConversions {
 
       value must beLike {
         case Failure(S3Exception(404, "NoSuchKey", _, _)) => ok
-        case Failure(err) => failure("Unexpected failure: " + err)
-        case Success(x) => failure("Error was expected, no error received: " + x)
+        case Failure(err) => ko("Unexpected failure: " + err)
+        case Success(x) => ko("Error was expected, no error received: " + x)
       }
     }
 
@@ -303,7 +302,7 @@ class S3Spec extends Specification with NoTimeConversions {
       val value = await(result)
       value match {
         case BucketFile("headerTest.txt", _, _, _, Some(headers)) => (headers get "x-amz-meta-testheader") must_== Some("testHeaderValue")
-        case f => failure("Wrong file returned: " + f)
+        case f => ko("Wrong file returned: " + f)
       }
     }
 
