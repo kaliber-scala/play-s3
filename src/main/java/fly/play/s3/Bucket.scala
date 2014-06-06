@@ -1,17 +1,16 @@
 package fly.play.s3
 
 import java.util.Date
+
 import scala.collection.JavaConversions.asScalaBuffer
 import scala.collection.JavaConversions.mapAsScalaMap
 import scala.concurrent.Future
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
-import play.api.libs.ws.Response
-import fly.play.s3.acl.ACLList
 import scala.xml.Elem
-import play.api.libs.json.JsValue
-import play.api.libs.json.JsObject
+
+import fly.play.s3.acl.ACLList
 import fly.play.s3.upload.PolicyBuilder
-import fly.play.s3.upload.Condition
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
+import play.api.libs.ws.WSResponse
 
 /**
  * Representation of a bucket
@@ -61,7 +60,7 @@ case class Bucket(
 
       BucketFile(itemName,
         headers("Content-Type"),
-        response.ahcResponse.getResponseBodyAsBytes,
+        response.underlying[com.ning.http.client.Response].getResponseBodyAsBytes,
         None,
         Some(headers))
     }
@@ -203,9 +202,9 @@ case class Bucket(
   def getAcl(itemName: String): Future[ACLList] =
     s3.getAcl(name, itemName) map aclListResponse
 
-  private def extractHeaders(response: Response) = {
+  private def extractHeaders(response: WSResponse) = {
     for {
-      (key, value) <- response.ahcResponse.getHeaders.toMap
+      (key, value) <- response.underlying[com.ning.http.client.Response].getHeaders.toMap
       if (value.size > 0)
     } yield key -> value.head
   }

@@ -1,13 +1,13 @@
 name := "play-s3"
 
-version := "4.0.1"
+version := "5.0.0"
 
 organization := "nl.rhinofly"
 
 libraryDependencies ++= Seq(
-  "com.typesafe.play" %% "play" % "2.2.0",
-  "nl.rhinofly" %% "play-aws-utils" % "3.0.0",
-  "com.typesafe.play" %% "play-test" % "2.2.3" % "test",
+  "com.typesafe.play" %% "play-ws" % "2.3.0",
+  "nl.rhinofly" %% "play-aws-utils" % "4.0.2",
+  "com.typesafe.play" %% "play-test" % "2.3.0" % "test",
   "org.specs2" %% "specs2" % "2.3.12" % "test"
 )
 

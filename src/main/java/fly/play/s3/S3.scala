@@ -4,12 +4,12 @@ import scala.concurrent.Future
 import fly.play.aws.Aws
 import fly.play.aws.auth.AwsCredentials
 import play.api.http.ContentTypeOf
-import play.api.libs.ws.Response
 import fly.play.aws.auth.Aws4Signer
 import fly.play.aws.auth.Signer
 import play.api.libs.ws.WS
-import play.api.mvc.WithHeaders
+import play.api.Play.current
 import play.api.http.Writeable
+import play.api.libs.ws.WSResponse
 
 /**
  * Amazon Simple Storage Service
@@ -19,7 +19,7 @@ object S3 {
   @deprecated("The minimal part size is not checked anymore, this variable will be removed", "3.3.1")
   val MINIMAL_PART_SIZE = 5 * 1024 * 1024
 
-  def config = play.api.Play.current.configuration
+  def config = current.configuration
 
   val regionEndpoints = Map(
       "us-east-1" -> "s3.amazonaws.com",
@@ -99,7 +99,7 @@ class S3(val https: Boolean, val host: String, val region:String)(implicit val c
    *
    * @see Bucket.add
    */
-  def put(bucketName: String, bucketFile: BucketFile): Future[Response] = {
+  def put(bucketName: String, bucketFile: BucketFile): Future[WSResponse] = {
     val acl = bucketFile.acl getOrElse PUBLIC_READ
 
     implicit val fileContentType = ContentTypeOf[Array[Byte]](Some(bucketFile.contentType))
@@ -112,7 +112,7 @@ class S3(val https: Boolean, val host: String, val region:String)(implicit val c
       .put(bucketFile.content)
   }
 
-  def putAcl(bucketName: String, sourcePath: String, acl: ACL): Future[Response] = {
+  def putAcl(bucketName: String, sourcePath: String, acl: ACL): Future[WSResponse] = {
     awsWithSigner
       .url(httpUrl(bucketName, sourcePath))
       .withQueryString("acl" -> "")
@@ -120,7 +120,7 @@ class S3(val https: Boolean, val host: String, val region:String)(implicit val c
       .put
   }
 
-  def getAcl(bucketName: String, sourcePath: String): Future[Response] = {
+  def getAcl(bucketName: String, sourcePath: String): Future[WSResponse] = {
     awsWithSigner
       .url(httpUrl(bucketName, sourcePath))
       .withQueryString("acl" -> "")
@@ -144,7 +144,7 @@ class S3(val https: Boolean, val host: String, val region:String)(implicit val c
    * @see Bucket.list
    */
   def get(bucketName: String, path: Option[String], prefix: Option[String],
-    delimiter: Option[String], marker: Option[String]): Future[Response] =
+    delimiter: Option[String], marker: Option[String]): Future[WSResponse] =
 
     awsWithSigner
       .url(httpUrl(bucketName, path.getOrElse("")))
@@ -162,7 +162,7 @@ class S3(val https: Boolean, val host: String, val region:String)(implicit val c
    *
    * @see Bucket.remove
    */
-  def delete(bucketName: String, path: String): Future[Response] =
+  def delete(bucketName: String, path: String): Future[WSResponse] =
     awsWithSigner
       .url(httpUrl(bucketName, path))
       .delete
@@ -203,7 +203,7 @@ class S3(val https: Boolean, val host: String, val region:String)(implicit val c
    *
    * @see Bucket.rename
    */
-  def putCopy(sourceBucketName: String, sourcePath: String, destinationBucketName: String, destinationPath: String, acl: ACL): Future[Response] = {
+  def putCopy(sourceBucketName: String, sourcePath: String, destinationBucketName: String, destinationPath: String, acl: ACL): Future[WSResponse] = {
     val source = "/" + sourceBucketName + "/" + sourcePath
 
     awsWithSigner
@@ -221,7 +221,7 @@ class S3(val https: Boolean, val host: String, val region:String)(implicit val c
    *
    * @see Bucket.add
    */
-  def initiateMultipartUpload(bucketName: String, bucketFile: BucketFile): Future[Response] = {
+  def initiateMultipartUpload(bucketName: String, bucketFile: BucketFile): Future[WSResponse] = {
     require(bucketFile.content.isEmpty, "The given file should not contain content")
 
     val acl = bucketFile.acl getOrElse PUBLIC_READ
@@ -245,7 +245,7 @@ class S3(val https: Boolean, val host: String, val region:String)(implicit val c
    *
    * @see initiateMultipartUpload
    */
-  def abortMultipartUpload(bucketName: String, uploadTicket: BucketFileUploadTicket): Future[Response] = {
+  def abortMultipartUpload(bucketName: String, uploadTicket: BucketFileUploadTicket): Future[WSResponse] = {
 
     awsWithSigner
       .url(httpUrl(bucketName, uploadTicket.name))
@@ -263,7 +263,7 @@ class S3(val https: Boolean, val host: String, val region:String)(implicit val c
    *
    * @see initiateMultipartUpload
    */
-  def uploadPart(bucketName: String, uploadTicket: BucketFileUploadTicket, bucketFilePart: BucketFilePart): Future[Response] = {
+  def uploadPart(bucketName: String, uploadTicket: BucketFileUploadTicket, bucketFilePart: BucketFilePart): Future[WSResponse] = {
     require(bucketFilePart.partNumber > 0, "The partNumber must be greater than 0")
     require(bucketFilePart.partNumber < 10001, "The partNumber must be lesser than 10001")
 
@@ -285,7 +285,7 @@ class S3(val https: Boolean, val host: String, val region:String)(implicit val c
    * @see initiateMultipartUpload
    * @see uploadPart
    */
-  def completeMultipartUpload(bucketName: String, uploadTicket: BucketFileUploadTicket, partUploadTickets: Seq[BucketFilePartUploadTicket]): Future[Response] = {
+  def completeMultipartUpload(bucketName: String, uploadTicket: BucketFileUploadTicket, partUploadTickets: Seq[BucketFilePartUploadTicket]): Future[WSResponse] = {
     val body = <CompleteMultipartUpload>{ partUploadTickets.map(_.toXml) }</CompleteMultipartUpload>
 
     awsWithSigner
