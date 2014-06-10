@@ -9,6 +9,7 @@ dist
 /.classpath
 /.project
 test/conf
+src/test/conf
 /.cache
 .target
 /bin
