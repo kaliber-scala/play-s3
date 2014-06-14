@@ -4,6 +4,8 @@ version := "5.0.0"
 
 organization := "nl.rhinofly"
 
+crossScalaVersions := Seq("2.10.4", "2.11.1")
+
 libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-ws" % "2.3.0",
   "nl.rhinofly" %% "play-aws-utils" % "4.0.2",
