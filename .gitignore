@@ -13,3 +13,4 @@ src/test/conf
 /.cache
 .target
 /bin
+.idea
