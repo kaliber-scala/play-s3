@@ -34,14 +34,14 @@ object S3 {
 
   def https = config getBoolean "s3.https" getOrElse false
 
-  def bucketInHostname = config getBoolean "s3.bucketInHostname" getOrElse true
+  def pathStyleAccess = config getBoolean "s3.pathStyleAccess" getOrElse false
 
   def host = config getString "s3.host" getOrElse regionEndpoints(region)
 
   def region = config getString "s3.region" getOrElse "us-east-1"
 
   def fromConfig(implicit credentials: AwsCredentials) =
-    new S3(https, host, region, bucketInHostname)
+    new S3(https, host, region, pathStyleAccess)
 
   /**
    * Utility method to create a bucket.
@@ -67,7 +67,7 @@ object S3 {
 
 }
 
-class S3(val https: Boolean, val host: String, val region: String, val bucketInHostname: Boolean = true)(implicit val credentials: AwsCredentials) {
+class S3(val https: Boolean, val host: String, val region: String, val pathStyleAccess: Boolean = false)(implicit val credentials: AwsCredentials) {
 
   lazy val signer = new S3Signer(credentials, region)
   lazy val awsWithSigner = Aws withSigner signer
@@ -87,11 +87,11 @@ class S3(val https: Boolean, val host: String, val region: String, val bucketInH
   def getBucket(bucketName: String, delimiter: String): Bucket =
     Bucket(bucketName, Some(delimiter), this)
 
-  protected def httpUrl(bucketName: String, path: String) = {
+  protected[s3] def httpUrl(bucketName: String, path: String) = {
     val protocol = if (https) "https" else "http"
 
-    if (bucketInHostname) s"$protocol://$bucketName.$host/$path"
-    else s"$protocol://$host/$bucketName/$path"
+    if (pathStyleAccess) s"$protocol://$host/$bucketName/$path"
+    else s"$protocol://$bucketName.$host/$path"
   }
 
   /**

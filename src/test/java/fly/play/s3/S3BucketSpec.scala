@@ -1,128 +1,24 @@
 package fly.play.s3
 
-import java.io.File
-import java.lang.IllegalArgumentException
 import java.util.Date
-import scala.concurrent.Await
-import scala.concurrent.Awaitable
-import scala.concurrent.Future
+
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
-import scala.concurrent.duration.DurationInt
-import scala.util.Failure
-import scala.util.Success
-import org.specs2.execute.AsResult
-import org.specs2.mutable.Specification
-import org.specs2.specification.Example
-import org.specs2.time.NoTimeConversions
-import fly.play.aws.auth.SimpleAwsCredentials
+import scala.util.{Failure, Success}
 import fly.play.aws.auth.UrlEncoder
-import fly.play.s3.acl.CanonicalUser
-import fly.play.s3.acl.FULL_CONTROL
-import fly.play.s3.acl.Grant
-import fly.play.s3.acl.Group
-import fly.play.s3.acl.READ
-import fly.play.s3.upload.Condition
-import fly.play.s3.upload.Form
-import fly.play.s3.upload.FormElement
+import fly.play.s3.acl.{CanonicalUser, FULL_CONTROL, Grant, Group, READ}
+import fly.play.s3.upload.{Condition, Form, FormElement}
 import play.api.Play.current
-import play.api.http.HeaderNames.CONTENT_TYPE
-import play.api.http.HeaderNames.LOCATION
+import play.api.http.HeaderNames.{CONTENT_TYPE, LOCATION}
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.libs.ws.WS
-import play.api.test.FakeApplication
 import play.api.test.Helpers.running
 import utils.MultipartFormData
-import play.api.Application
 
-class S3Spec extends Specification with NoTimeConversions {
 
+class S3BucketSpec extends S3SpecSetup {
   sequential
-
-  def testBucketName(implicit app:Application) =
-    app.configuration.getString("testBucketName").getOrElse(sys.error("Could not find testBucketName in configuration"))
-
-  def fakeApplication(additionalConfiguration: Map[String, _ <: Any] = Map.empty) =
-    FakeApplication(new File("./src/test"), additionalConfiguration = additionalConfiguration)
-
-  implicit class InAppExample(s: String) {
-    def inApp[T: AsResult](r: => T): Example =
-      s in running(fakeApplication()) {
-        r
-      }
-  }
-
-  def s3WithCredentials = S3.fromConfig
-
-  def await[T](a: Awaitable[T]): T =
-    Await.result(a, 120.seconds)
-
-  def noException[T](a: Awaitable[T]) =
-    await(a) must not(throwA[Throwable])
-
-  "S3" should {
-
-    "have the correct default value for host" inApp {
-      running(fakeApplication(Map("s3.host" -> null, "s3.region" -> null))) {
-        s3WithCredentials.host === "s3.amazonaws.com"
-      }
-    }
-
-    "have the correct default value for https" inApp {
-      s3WithCredentials.https === false
-    }
-
-    "have the correct default value for region" inApp {
-      running(fakeApplication(Map("s3.region" -> null))) {
-        s3WithCredentials.region === "us-east-1"
-      }
-    }
-
-    "get the correct value for host from the configuration" in {
-      running(fakeApplication(Map("s3.host" -> "testHost"))) {
-        s3WithCredentials.host === "testHost"
-      }
-    }
-
-    "get the correct value for https from the configuration" in {
-      running(fakeApplication(Map("s3.https" -> true))) {
-        s3WithCredentials.https === true
-      }
-    }
-
-    "get the correct default value for region from the configuration" inApp {
-      running(fakeApplication(Map("s3.region" -> "eu-west-1"))) {
-        s3WithCredentials.region === "eu-west-1"
-      }
-    }
-
-    "get the correct default value for host if region is set" inApp {
-      running(fakeApplication(Map("s3.region" -> "eu-west-1", "s3.host" -> null))) {
-        s3WithCredentials.host === "s3-eu-west-1.amazonaws.com"
-      }
-    }
-
-    "return an instance of bucket" inApp {
-      S3(testBucketName) must beAnInstanceOf[Bucket]
-    }
-
-    "return an instance of bucket with different credentials" inApp {
-      implicit val awsCredentials = SimpleAwsCredentials("test", "test")
-      val bucket = S3(testBucketName)
-
-      bucket.s3.credentials must_== awsCredentials
-    }
-
-    "create the correct url" inApp {
-      implicit val credentials = SimpleAwsCredentials("test", "test")
-      val url = S3.url(testBucketName, "privateREADME.txt", 1234)
-      val host = S3.host
-
-      url must startWith(s"http://$testBucketName.$host/privateREADME.txt")
-      url must contain("Expires=1234")
-    }
-
-  }
 
   "Bucket" should {
     def testBucket = S3(testBucketName)
@@ -159,7 +55,7 @@ class S3Spec extends Specification with NoTimeConversions {
 
       val result = testBucket + BucketFile("README.txt", "text/plain", """
 		        This is a bucket used for testing the S3 module of play
-		        """.getBytes)
+                                                                       		        """.getBytes)
 
       noException(result)
     }
@@ -187,7 +83,7 @@ class S3Spec extends Specification with NoTimeConversions {
 
       val result = testBucket + BucketFile("testPrefix/README.txt", "text/plain", """
 		        This is a bucket used for testing the S3 module of play
-		        """.getBytes)
+                                                                                  		        """.getBytes)
 
       noException(result)
     }
@@ -245,7 +141,7 @@ class S3Spec extends Specification with NoTimeConversions {
       url = testBucket.url(fileName, 86400)
       val result = testBucket + BucketFile(fileName, "text/plain", """
 		        This is a bucket used for testing the S3 module of play
-		        """.getBytes, Some(AUTHENTICATED_READ), None)
+                                                                   		        """.getBytes, Some(AUTHENTICATED_READ), None)
 
       noException(result)
     }
@@ -260,7 +156,7 @@ class S3Spec extends Specification with NoTimeConversions {
 
     "be able to rename a file" inApp {
 
-      val result = testBucket rename ("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
+      val result = testBucket rename("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
       noException(result)
     }
 
@@ -275,8 +171,8 @@ class S3Spec extends Specification with NoTimeConversions {
 
       value must beLike {
         case Seq(
-          Grant(FULL_CONTROL, CanonicalUser(_, _)),
-          Grant(READ, Group(uri))) =>
+        Grant(FULL_CONTROL, CanonicalUser(_, _)),
+        Grant(READ, Group(uri))) =>
           uri must endWith("AllUsers")
       }
     }
@@ -291,7 +187,7 @@ class S3Spec extends Specification with NoTimeConversions {
 
       val result = testBucket + BucketFile("headerTest.txt", "text/plain", """
 		        This file is used for testing custome headers
-		        """.getBytes, None, Some(Map("x-amz-meta-testheader" -> "testHeaderValue")))
+                                                                           		        """.getBytes, None, Some(Map("x-amz-meta-testheader" -> "testHeaderValue")))
 
       noException(result)
     }
@@ -364,7 +260,7 @@ class S3Spec extends Specification with NoTimeConversions {
       val policy = policyBuilder.json
 
       val expectedConditions = Json.arr(
-        Json.obj("bucket" -> "s3playlibrary.rhinofly.net"),
+        Json.obj("bucket" -> "play-s3-test.wiredthing.com"),
         Json.obj("key" -> "privateREADME.txt"),
         Json.obj("acl" -> "public-read"),
         Json.arr("content-length-range", 0, 10000),
@@ -377,7 +273,7 @@ class S3Spec extends Specification with NoTimeConversions {
 
         val `1 minute from now` = System.currentTimeMillis + (1 * 60 * 1000)
 
-        import Condition._
+        import fly.play.s3.upload.Condition._
         val key = Condition.key
         val expectedFileName = "test/file.html"
         val expectedRedirectUrl = "http://fakehost:9000"
@@ -397,15 +293,15 @@ class S3Spec extends Specification with NoTimeConversions {
         val formFieldsFromPolicy =
           Form(policy).fields
             .map {
-              case FormElement("key", _, true) =>
-                "key" -> expectedFileName
-              case FormElement("x-amz-meta-tag", _, true) =>
-                "x-amz-meta-tag" -> expectedTags
-              case FormElement(CONTENT_TYPE, _, true) =>
-                CONTENT_TYPE -> expectedContentType
-              case FormElement(name, value, false) =>
-                name -> value
-            }
+            case FormElement("key", _, true) =>
+              "key" -> expectedFileName
+            case FormElement("x-amz-meta-tag", _, true) =>
+              "x-amz-meta-tag" -> expectedTags
+            case FormElement(CONTENT_TYPE, _, true) =>
+              CONTENT_TYPE -> expectedContentType
+            case FormElement(name, value, false) =>
+              name -> value
+          }
 
         val expectedContent = "test text"
         // file should be the last field
@@ -459,12 +355,12 @@ class S3Spec extends Specification with NoTimeConversions {
       def batched[T, R](amount: Int, s: Seq[T])(f: T => Future[R]): Future[Seq[R]] =
         s.grouped(amount)
           .foldLeft(Future.successful(Seq.empty[R])) { (acc, elems) =>
-            acc.flatMap { results =>
-              Future.sequence(elems.map(f))
-                .map(results ++ _)
-                .map { r => print('-'); r }
-            }
+          acc.flatMap { results =>
+            Future.sequence(elems.map(f))
+              .map(results ++ _)
+              .map { r => print('-'); r}
           }
+        }
 
       val sizeBeforeAddingItems = await(testBucket.list).size
       val amount = 1100
@@ -483,8 +379,8 @@ class S3Spec extends Specification with NoTimeConversions {
             S3.fromConfig
               .putCopy(testBucketName, exampleFile.name, testBucketName, name, PUBLIC_READ)
               .map { _ =>
-                name
-              }
+              name
+            }
           }
         }
       }
