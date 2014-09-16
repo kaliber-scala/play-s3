@@ -20,7 +20,7 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "play-s3" % "5.0.0"
+    "nl.rhinofly" %% "play-s3" % "5.0.1"
     // use the following version for play 2.2
     //"nl.rhinofly" %% "play-s3" % "4.0.0"
     // use the following version for play 2.1
@@ -52,6 +52,8 @@ s3.region="eu-west-1"
 s3.host="your.domain.name"
 #default is false
 s3.https=true
+#default is false
+s3.pathStyleAccess=true
 ```
 
 Usage
