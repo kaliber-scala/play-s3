@@ -1,6 +1,6 @@
 name := "play-s3"
 
-version := "5.0.1"
+version := "5.0.2"
 
 organization := "nl.rhinofly"
 
@@ -10,7 +10,7 @@ crossScalaVersions := Seq("2.10.4", "2.11.2")
 
 libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-ws" % "2.3.4",
-  "nl.rhinofly" %% "play-aws-utils" % "4.0.3",
+  "nl.rhinofly" %% "play-aws-utils" % "4.1.0",
   "com.typesafe.play" %% "play-test" % "2.3.4" % "test",
   "org.specs2" %% "specs2" % "2.3.12" % "test"
 )
