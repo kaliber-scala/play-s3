@@ -1,16 +1,15 @@
 package fly.play.s3
 
 import java.util.Date
-
 import scala.collection.JavaConversions.asScalaBuffer
 import scala.collection.JavaConversions.mapAsScalaMap
 import scala.concurrent.Future
 import scala.xml.Elem
-
-import fly.play.s3.acl.ACLList
-import fly.play.s3.upload.PolicyBuilder
+import fly.play.aws.policy.PolicyBuilder
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.ws.WSResponse
+import fly.play.aws.acl.ACLList
+import fly.play.aws.policy.Condition
 
 /**
  * Representation of a bucket
@@ -34,11 +33,20 @@ case class Bucket(
     s3.url(name, itemName, expires)
 
   /**
+   * Creates an authenticated url for an item with the given name and method
+   *
+   * @param itemName	The item for which the url should be created
+   * @param expires		The expiration in seconds from now
+   */
+  def url(itemName: String, expires: Int, method: String): String =
+    s3.url(name, itemName, expires, method)
+    
+  /**
    * Creates an unsigned url for the given item name
    *
    * @param itemName  The item for which the url should be created
    */
-  def url(itemName: String): String =
+  def url(itemName: String, method: String = "GET"): String =
     s3.url(name, itemName)
 
   /**
@@ -47,7 +55,7 @@ case class Bucket(
    * @param expires		The date this policy expires
    */
   def uploadPolicy(expiration: Date): PolicyBuilder =
-    PolicyBuilder(name, expiration)(s3.signer)
+    PolicyBuilder(expiration)(s3.client.signer).withConditions(Condition.string("bucket") eq name)
 
   /**
    * Retrieves a single item with the given name

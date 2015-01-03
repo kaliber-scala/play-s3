@@ -1,7 +1,7 @@
 package fly.play.s3
 
 import scala.xml.Elem
-import fly.play.aws.xml.AwsError
+import fly.play.aws.AwsError
 
 case class S3Exception(status: Int, code: String, message: String, originalXml: Option[Elem]) extends RuntimeException(
   s"""|Problem accessing S3. Status $status, code $code, message '$message'

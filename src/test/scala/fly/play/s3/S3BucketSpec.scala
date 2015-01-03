@@ -2,20 +2,20 @@ package fly.play.s3
 
 import java.util.Date
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration.Duration
-import scala.util.{Failure, Success}
-import fly.play.aws.auth.UrlEncoder
-import fly.play.s3.acl.{CanonicalUser, FULL_CONTROL, Grant, Group, READ}
-import fly.play.s3.upload.{Condition, Form, FormElement}
+import scala.util.{ Failure, Success }
+import fly.play.aws.AwsUrlEncoder
+import fly.play.aws.acl.{ CanonicalUser, FULL_CONTROL, Grant, Group, READ }
+import fly.play.aws.policy.Condition
+import fly.play.s3.upload.{ Form, FormElement }
 import play.api.Play.current
-import play.api.http.HeaderNames.{CONTENT_TYPE, LOCATION}
+import play.api.http.HeaderNames.{ CONTENT_TYPE, LOCATION }
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.libs.ws.WS
 import play.api.test.Helpers.running
 import utils.MultipartFormData
-
 
 class S3BucketSpec extends S3SpecSetup {
   sequential
@@ -46,8 +46,8 @@ class S3BucketSpec extends S3SpecSetup {
 
       value must beLike {
         case Failure(S3Exception(404, "NoSuchKey", _, _)) => ok
-        case Failure(err) => ko("Unexpected failure: " + err)
-        case Success(x) => ko("Error was expected, no error received: " + x)
+        case Failure(err)                                 => ko("Unexpected failure: " + err)
+        case Success(x)                                   => ko("Error was expected, no error received: " + x)
       }
     }
 
@@ -75,7 +75,7 @@ class S3BucketSpec extends S3SpecSetup {
 
       value match {
         case BucketFile("README.txt", _, _, _, _) => success
-        case f => failure("Wrong file returned: " + f)
+        case f                                    => failure("Wrong file returned: " + f)
       }
     }
 
@@ -108,11 +108,11 @@ class S3BucketSpec extends S3SpecSetup {
       val seq = value.toSeq
       seq(0) match {
         case BucketItem("README.txt", false) => success
-        case f => failure("Wrong file returned: " + f)
+        case f                               => failure("Wrong file returned: " + f)
       }
       seq(1) match {
         case BucketItem("testPrefix/", true) => success
-        case f => failure("Wrong file returned: " + f)
+        case f                               => failure("Wrong file returned: " + f)
       }
     }
 
@@ -146,6 +146,15 @@ class S3BucketSpec extends S3SpecSetup {
       noException(result)
     }
 
+    "be able to create a url for methods other than GET" inApp {
+      val getUrl1 = testBucket.url("test.txt", 86400) 
+      val getUrl2 = testBucket.url("test.txt", 86400)
+      val postUrl = testBucket.url("test.txt", 86400, method = "POST")
+      
+      getUrl1 === getUrl2
+      postUrl !== getUrl1
+    }
+    
     "be able to retrieve the private file using the generated url" inApp {
 
       val result = WS.url(url).get
@@ -156,7 +165,7 @@ class S3BucketSpec extends S3SpecSetup {
 
     "be able to rename a file" inApp {
 
-      val result = testBucket rename("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
+      val result = testBucket rename ("privateREADME.txt", "private2README.txt", AUTHENTICATED_READ)
       noException(result)
     }
 
@@ -171,8 +180,8 @@ class S3BucketSpec extends S3SpecSetup {
 
       value must beLike {
         case Seq(
-        Grant(FULL_CONTROL, CanonicalUser(_, _)),
-        Grant(READ, Group(uri))) =>
+          Grant(FULL_CONTROL, CanonicalUser(_, _)),
+          Grant(READ, Group(uri))) =>
           uri must endWith("AllUsers")
       }
     }
@@ -273,7 +282,7 @@ class S3BucketSpec extends S3SpecSetup {
 
         val `1 minute from now` = System.currentTimeMillis + (1 * 60 * 1000)
 
-        import fly.play.s3.upload.Condition._
+        import fly.play.aws.policy.Condition._
         val key = Condition.key
         val expectedFileName = "test/file.html"
         val expectedRedirectUrl = "http://fakehost:9000"
@@ -288,20 +297,21 @@ class S3BucketSpec extends S3SpecSetup {
               successActionRedirect eq expectedRedirectUrl,
               header(CONTENT_TYPE) startsWith "text/",
               meta("tag").any)
+            .toPolicy
 
         // provide user input
         val formFieldsFromPolicy =
           Form(policy).fields
             .map {
-            case FormElement("key", _, true) =>
-              "key" -> expectedFileName
-            case FormElement("x-amz-meta-tag", _, true) =>
-              "x-amz-meta-tag" -> expectedTags
-            case FormElement(CONTENT_TYPE, _, true) =>
-              CONTENT_TYPE -> expectedContentType
-            case FormElement(name, value, false) =>
-              name -> value
-          }
+              case FormElement("key", _, true) =>
+                "key" -> expectedFileName
+              case FormElement("x-amz-meta-tag", _, true) =>
+                "x-amz-meta-tag" -> expectedTags
+              case FormElement(CONTENT_TYPE, _, true) =>
+                CONTENT_TYPE -> expectedContentType
+              case FormElement(name, value, false) =>
+                name -> value
+            }
 
         val expectedContent = "test text"
         // file should be the last field
@@ -310,8 +320,6 @@ class S3BucketSpec extends S3SpecSetup {
         val data = MultipartFormData(formFields, "asdfghjkl123")
 
         val response = await(WS.url(testBucket.url("")).post(data.body))
-
-        println(response.body)
 
         response.status === 303
         response.header(LOCATION).get must startWith(expectedRedirectUrl)
@@ -334,13 +342,13 @@ class S3BucketSpec extends S3SpecSetup {
     "be able to add and delete files with 'weird' names" inApp {
 
       def uploadListAndRemoveFileWithName(prefix: String, name: String) = {
-        await(testBucket + BucketFile(UrlEncoder.encodePath(prefix + name), "text/plain", "test".getBytes))
+        await(testBucket + BucketFile(AwsUrlEncoder.encodePath(prefix + name), "text/plain", "test".getBytes))
 
         await(testBucket.list(prefix)) must beLike {
           case Seq(BucketItem(itemName, false)) => itemName === (prefix + name)
         }
 
-        await(testBucket - UrlEncoder.encodePath(prefix + name))
+        await(testBucket - AwsUrlEncoder.encodePath(prefix + name))
 
         success
       }
@@ -355,12 +363,12 @@ class S3BucketSpec extends S3SpecSetup {
       def batched[T, R](amount: Int, s: Seq[T])(f: T => Future[R]): Future[Seq[R]] =
         s.grouped(amount)
           .foldLeft(Future.successful(Seq.empty[R])) { (acc, elems) =>
-          acc.flatMap { results =>
-            Future.sequence(elems.map(f))
-              .map(results ++ _)
-              .map { r => print('-'); r}
+            acc.flatMap { results =>
+              Future.sequence(elems.map(f))
+                .map(results ++ _)
+                .map { r => print('-'); r }
+            }
           }
-        }
 
       val sizeBeforeAddingItems = await(testBucket.list).size
       val amount = 1100
@@ -379,8 +387,8 @@ class S3BucketSpec extends S3SpecSetup {
             S3.fromConfig
               .putCopy(testBucketName, exampleFile.name, testBucketName, name, PUBLIC_READ)
               .map { _ =>
-              name
-            }
+                name
+              }
           }
         }
       }

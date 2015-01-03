@@ -56,13 +56,6 @@ Getting a bucket:
 
 ``` scala
 val bucket = S3("bucketName")
-
-//with other credentials
-implicit val credentials = ...
-val bucket = S3("bucketName")
-
-//or
-val bucket = S3("bucketName")(credentials)
 ```
 
 Adding a file:
@@ -189,6 +182,7 @@ val policy =
       successActionRedirect eq expectedRedirectUrl,
       header(CONTENT_TYPE) startsWith "text/",
       meta("tag").any)
+    .toPolicy
 
 // import Form helper
 import fly.play.s3.upload.Form

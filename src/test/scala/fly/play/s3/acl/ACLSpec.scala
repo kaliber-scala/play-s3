@@ -1,4 +1,4 @@
-package fly.play.s3.acl
+package fly.play.aws.acl
 
 import org.specs2.mutable.Specification
 

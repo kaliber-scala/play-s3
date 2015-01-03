@@ -2,31 +2,32 @@ package fly.play.s3.upload
 
 import java.util.Calendar
 import org.specs2.mutable.Specification
-import fly.play.aws.Aws.dates.iso8601DateFormat
-import fly.play.aws.auth.SimpleAwsCredentials
+import fly.play.aws.AwsDates.iso8601DateFormat
 import fly.play.s3.PUBLIC_READ
 import fly.play.s3.S3Signer
-import fly.play.s3.upload.Condition.acl
-import fly.play.s3.upload.Condition.contentLengthRange
-import fly.play.s3.upload.Condition.fromTuple
-import fly.play.s3.upload.Condition.header
-import fly.play.s3.upload.Condition.key
-import fly.play.s3.upload.Condition.meta
-import fly.play.s3.upload.Condition.string
-import fly.play.s3.upload.Condition.successActionRedirect
-import fly.play.s3.upload.Condition.xAmzSecurityToken
+import fly.play.aws.policy.Condition.acl
+import fly.play.aws.policy.Condition.contentLengthRange
+import fly.play.aws.policy.Condition.fromTuple
+import fly.play.aws.policy.Condition.header
+import fly.play.aws.policy.Condition.key
+import fly.play.aws.policy.Condition.meta
+import fly.play.aws.policy.Condition.string
+import fly.play.aws.policy.Condition.successActionRedirect
+import fly.play.aws.policy.Condition.xAmzSecurityToken
 import play.api.http.HeaderNames.CACHE_CONTROL
 import play.api.http.HeaderNames.CONTENT_DISPOSITION
 import play.api.http.HeaderNames.CONTENT_TYPE
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
-import fly.play.aws.auth.Aws4Signer
-import fly.play.aws.auth.SignerUtils
-import fly.play.aws.auth.Signer
+import fly.play.aws.Aws4Signer
+import fly.play.aws.AwsSigner
 import play.api.libs.ws.WS
 import play.api.http.Writeable
-import fly.play.aws.auth.AwsCredentials
-import fly.play.aws.auth.SimpleAwsCredentials
+import fly.play.aws.AwsCredentials
+import fly.play.aws.SimpleAwsCredentials
+import fly.play.aws.policy.StartsWith
+import fly.play.aws.policy.PolicyBuilder
+import fly.play.aws.policy.Eq
 
 object PolicyBuilderSpec extends Specification {
   "PolicyBuilder" should {
@@ -73,8 +74,9 @@ object testData {
 
   val date = createDate(2007, 12, 1)
 
-  def bigPolicy = PolicyBuilder("johnsmith", date)(signer)
+  def bigPolicy = PolicyBuilder(date)(signer)
     .withConditions(
+      "bucket" -> "johnsmith",
       acl eq PUBLIC_READ,
       contentLengthRange from 10 to 100,
       key startsWith "test/",
