@@ -22,7 +22,7 @@ object AwsCredentialsSpec extends Specification {
   "AwsCredentials" should {
 
     "retrieve from configuration" in app {
-      AwsCredentials.fromConfiguration() must_== AwsCredentials("testKey", "testSecret")
+      AwsCredentials.fromConfiguration must_== AwsCredentials("testKey", "testSecret")
     }
 
     "load prefixed from configuration" in app {

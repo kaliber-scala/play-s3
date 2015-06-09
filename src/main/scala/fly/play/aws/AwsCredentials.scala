@@ -20,7 +20,7 @@ object AwsCredentials extends ((String, String, Option[String]) => AwsCredential
 
   implicit def fromConfiguration(implicit app: Application): AwsCredentials = fromConfiguration("aws")
 
-  implicit def fromConfiguration(prefix: String = "aws")(implicit app: Application): AwsCredentials = {
+  def fromConfiguration(prefix: String)(implicit app: Application): AwsCredentials = {
     def error(key:String) = throw new PlayException("Configuration error", "Could not find " + key + " in settings")
     def getOpt(key:String) = app.configuration getString key
     def get(key:String) = getOpt(key) getOrElse error(key)
