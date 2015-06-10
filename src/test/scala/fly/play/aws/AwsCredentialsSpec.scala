@@ -12,7 +12,9 @@ object AwsCredentialsSpec extends Specification {
     FakeApplication(
       additionalConfiguration = Map(
         "aws.accessKeyId" -> "testKey",
-        "aws.secretKey" -> "testSecret"
+        "aws.secretKey" -> "testSecret",
+        "alt.accessKeyId" -> "altKey",
+        "alt.secretKey" -> "altSecret"
       )
     )
   ) { t }
@@ -21,6 +23,10 @@ object AwsCredentialsSpec extends Specification {
 
     "retrieve from configuration" in app {
       AwsCredentials.fromConfiguration must_== AwsCredentials("testKey", "testSecret")
+    }
+
+    "load prefixed from configuration" in app {
+      AwsCredentials.fromConfiguration("alt") must_== AwsCredentials("altKey","altSecret")
     }
 
     "implement unapply" in app {

@@ -18,12 +18,14 @@ object AwsCredentials extends ((String, String, Option[String]) => AwsCredential
   def apply(accessKeyId: String, secretKey: String, token: Option[String] = None): AwsCredentials =
     SimpleAwsCredentials(accessKeyId, secretKey, token)
 
-  implicit def fromConfiguration(implicit app: Application): AwsCredentials = {
+  implicit def fromConfiguration(implicit app: Application): AwsCredentials = fromConfiguration("aws")
+
+  def fromConfiguration(prefix: String)(implicit app: Application): AwsCredentials = {
     def error(key:String) = throw new PlayException("Configuration error", "Could not find " + key + " in settings")
     def getOpt(key:String) = app.configuration getString key
     def get(key:String) = getOpt(key) getOrElse error(key)
     
-    SimpleAwsCredentials(get("aws.accessKeyId"), get("aws.secretKey"), getOpt("aws.token"))
+    SimpleAwsCredentials(get(s"${prefix}.accessKeyId"), get(s"${prefix}.secretKey"), getOpt(s"${prefix}.token"))
   }
 }
 
