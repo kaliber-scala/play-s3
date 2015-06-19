@@ -1,13 +1,13 @@
 package fly.play.s3
 
 import play.api.libs.ws.WSClient
-import play.api.libs.ws.WSRequestHolder
+import play.api.libs.ws.WSRequest
 import fly.play.aws.AwsRequestHolder
 import fly.play.aws.AwsSigner
 
 class S3Client(private val wsClient: WSClient, val signer: AwsSigner, val configuration: S3Configuration) {
 
-  def resourceRequest(bucketName: String, path: String): WSRequestHolder = {
+  def resourceRequest(bucketName: String, path: String): WSRequest = {
     val url = resourceUrl(bucketName, path)
     new AwsRequestHolder(wsClient.url(url).withFollowRedirects(true), signer)
   }

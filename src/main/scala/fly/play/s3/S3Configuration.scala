@@ -2,6 +2,7 @@ package fly.play.s3
 
 import play.api.Application
 import fly.play.aws.AwsCredentials
+import play.api.Configuration
 
 case class S3Configuration(
   credentials: AwsCredentials,
@@ -24,14 +25,15 @@ object S3Configuration {
     "sa-east-1" -> "s3-sa-east-1.amazonaws.com"
   )
 
-  def fromConfig(implicit app: Application) = {
-    val config = app.configuration
+  def fromApplication(implicit app: Application) = fromConfiguration(app.configuration)
 
-    val region = config getString "s3.region" getOrElse "us-east-1"
-    val https = config getBoolean "s3.https" getOrElse true
-    val host = config getString "s3.host" getOrElse regionEndpoints(region)
-    val pathStyleAccess = config getBoolean "s3.pathStyleAccess" getOrElse true
+  def fromConfiguration(configuration: Configuration) = {
 
-    S3Configuration(AwsCredentials.fromConfiguration, region, https, host, pathStyleAccess)
+    val region = configuration getString "s3.region" getOrElse "us-east-1"
+    val https = configuration getBoolean "s3.https" getOrElse true
+    val host = configuration getString "s3.host" getOrElse regionEndpoints(region)
+    val pathStyleAccess = configuration getBoolean "s3.pathStyleAccess" getOrElse true
+
+    S3Configuration(AwsCredentials fromConfiguration configuration, region, https, host, pathStyleAccess)
   }
 }

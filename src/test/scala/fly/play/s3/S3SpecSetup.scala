@@ -6,14 +6,13 @@ import scala.concurrent.{Await, Awaitable}
 import scala.concurrent.duration.DurationInt
 import org.specs2.execute.AsResult
 import org.specs2.mutable.Specification
-import org.specs2.specification.Example
-import org.specs2.time.NoTimeConversions
+import org.specs2.specification.core.Fragment
 import play.api.Play.current
 import play.api.test.FakeApplication
 import play.api.test.Helpers.running
 import play.api.Application
 
-trait S3SpecSetup extends Specification with NoTimeConversions {
+trait S3SpecSetup extends Specification {
   def testBucketName(implicit app: Application) =
     app.configuration.getString("testBucketName").getOrElse(sys.error("Could not find testBucketName in configuration"))
 
@@ -21,13 +20,11 @@ trait S3SpecSetup extends Specification with NoTimeConversions {
     FakeApplication(new File("test"), additionalConfiguration = additionalConfiguration)
 
   implicit class InAppExample(s: String) {
-    def inApp[T: AsResult](r: => T): Example =
+    def inApp[T: AsResult](r: => T): Fragment =
       s in running(fakeApplication()) {
         r
       }
   }
-
-  def s3WithCredentials = S3.fromConfig
 
   def await[T](a: Awaitable[T]): T =
     Await.result(a, 120.seconds)

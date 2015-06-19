@@ -8,7 +8,7 @@ dist
 /.settings
 /.classpath
 /.project
-test/conf
+test/conf/application.conf
 src/test/conf
 /.cache
 .target

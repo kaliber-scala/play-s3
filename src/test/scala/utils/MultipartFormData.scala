@@ -3,9 +3,10 @@ package utils
 import play.api.http.ContentTypeOf
 import play.api.mvc.Codec
 import play.api.http.Writeable
+import scala.concurrent.ExecutionContext
 
 case class MultipartFormData(elements: Seq[NameValuePair], boundary: String)(
-  implicit codec: Codec) {
+  implicit codec: Codec, ec: ExecutionContext) {
 
   private val HTTP_SEPARATOR = "\r\n"
   private val actualBoundary = "--" + boundary

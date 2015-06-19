@@ -1,10 +1,6 @@
 package fly.play.s3
 
 import java.util.Date
-
-import scala.concurrent.{ Await, Future }
-import scala.concurrent.duration.Duration
-import scala.util.{ Failure, Success }
 import fly.play.aws.AwsUrlEncoder
 import fly.play.aws.acl.{ CanonicalUser, FULL_CONTROL, Grant, Group, READ }
 import fly.play.aws.policy.Condition
@@ -12,15 +8,25 @@ import fly.play.s3.upload.{ Form, FormElement }
 import play.api.Play.current
 import play.api.http.HeaderNames.{ CONTENT_TYPE, LOCATION }
 import play.api.libs.json.Json
+import play.api.libs.json.JsArray
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.libs.ws.WS
 import play.api.test.Helpers.running
+import scala.concurrent.duration.Duration
+import scala.concurrent.{ Await, Future }
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.{ Failure, Success }
 import utils.MultipartFormData
 
 class S3BucketSpec extends S3SpecSetup {
   sequential
 
+  "S3 should return an instance of bucket" inApp {
+    S3(testBucketName) must beAnInstanceOf[Bucket]
+  }
+
   "Bucket" should {
+
     def testBucket = S3(testBucketName)
 
     "by default have / as delimiter" inApp {
@@ -53,16 +59,17 @@ class S3BucketSpec extends S3SpecSetup {
 
     "be able to add a file" inApp {
 
-      val result = testBucket + BucketFile("README.txt", "text/plain", """
-		        This is a bucket used for testing the S3 module of play
-                                                                       		        """.getBytes)
+      val result = testBucket +
+        BucketFile("README.txt", "text/plain", """
+          This is a bucket used for testing the S3 module of play
+        """.getBytes)
 
       noException(result)
     }
 
     "with the correct mime type" inApp {
 
-      val result = s3WithCredentials.get(testBucket.name, Some("README.txt"), None, None, None)
+      val result = S3.fromApplication.get(testBucket.name, Some("README.txt"), None, None, None)
       val value = await(result)
 
       value.header(CONTENT_TYPE) must_== Some("text/plain")
@@ -81,9 +88,10 @@ class S3BucketSpec extends S3SpecSetup {
 
     "be able add a file with a prefix" inApp {
 
-      val result = testBucket + BucketFile("testPrefix/README.txt", "text/plain", """
-		        This is a bucket used for testing the S3 module of play
-                                                                                  		        """.getBytes)
+      val result = testBucket +
+        BucketFile("testPrefix/README.txt", "text/plain", """
+          This is a bucket used for testing the S3 module of play
+        """.getBytes)
 
       noException(result)
     }
@@ -140,8 +148,8 @@ class S3BucketSpec extends S3SpecSetup {
       val fileName = "privateREADME.txt"
       url = testBucket.url(fileName, 86400)
       val result = testBucket + BucketFile(fileName, "text/plain", """
-		        This is a bucket used for testing the S3 module of play
-                                                                   		        """.getBytes, Some(AUTHENTICATED_READ), None)
+            This is a bucket used for testing the S3 module of play
+                                                                               """.getBytes, Some(AUTHENTICATED_READ), None)
 
       noException(result)
     }
@@ -172,7 +180,7 @@ class S3BucketSpec extends S3SpecSetup {
     "be able to retrieve the headers of a file" inApp {
       val fileName = "headerTest.txt"
 
-    	val headers = Map("x-amz-meta-custom-header" -> "test-header")
+      val headers = Map("x-amz-meta-custom-header" -> "test-header")
       await(testBucket add BucketFile(fileName, "text/plain", "test".getBytes, headers = Some(headers)))
 
       val retrievedHeaders = await(testBucket getHeadersOf fileName)
@@ -240,8 +248,8 @@ class S3BucketSpec extends S3SpecSetup {
     "be able to add a file with custom headers" inApp {
 
       val result = testBucket + BucketFile("headerTest.txt", "text/plain", """
-		        This file is used for testing custome headers
-                                                                           		        """.getBytes, None, Some(Map("x-amz-meta-testheader" -> "testHeaderValue")))
+            This file is used for testing custome headers
+                                                                                       """.getBytes, None, Some(Map("x-amz-meta-testheader" -> "testHeaderValue")))
 
       noException(result)
     }
@@ -319,11 +327,11 @@ class S3BucketSpec extends S3SpecSetup {
         Json.obj("acl" -> "public-read"),
         Json.arr("content-length-range", 0, 10000),
         Json.obj(CONTENT_TYPE -> "image/jpeg"))
-      (policy \ "conditions") === expectedConditions
+      (policy \ "conditions").as[JsArray] === expectedConditions
     }
 
     "be able to supply an uploadPolicy that can be used to alow browser upload" in {
-      running(fakeApplication(Map("ws.followRedirects" -> false))) {
+      running(fakeApplication(Map("play.ws.followRedirects" -> false))) {
 
         val `1 minute from now` = System.currentTimeMillis + (1 * 60 * 1000)
 
@@ -429,7 +437,7 @@ class S3BucketSpec extends S3SpecSetup {
           batched(40, 1 to amount) { number =>
             val name = fileName(number)
 
-            S3.fromConfig
+            S3.fromApplication
               .putCopy(testBucketName, exampleFile.name, testBucketName, name, PUBLIC_READ)
               .map { _ =>
                 name

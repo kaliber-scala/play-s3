@@ -1,19 +1,23 @@
 package fly.play.s3
 
 import scala.concurrent.Future
-import play.api.http.ContentTypeOf
 import play.api.libs.ws.WS
 import play.api.http.Writeable
 import play.api.libs.ws.WSResponse
 import play.api.Application
+import play.api.Configuration
+import play.api.libs.ws.WSClient
 
 /**
  * Amazon Simple Storage Service
  */
 object S3 {
 
-  def fromConfig(implicit app: Application) =
-    new S3(S3Client(WS.client, S3Configuration.fromConfig))
+  def fromApplication(implicit app: Application) =
+    fromConfiguration(WS.client, app.configuration)
+
+  def fromConfiguration(client: WSClient, configuration: Configuration) =
+    new S3(S3Client(client, S3Configuration fromConfiguration configuration))
 
   /**
    * Utility method to create a bucket.
@@ -21,7 +25,7 @@ object S3 {
    * @see Bucket
    */
   def apply(bucketName: String)(implicit app: Application): Bucket =
-    fromConfig.getBucket(bucketName)
+    fromApplication.getBucket(bucketName)
 
   /**
    * Utility method to create a bucket.
@@ -29,13 +33,13 @@ object S3 {
    * @see Bucket
    */
   def apply(bucketName: String, delimiter: String)(implicit app: Application): Bucket =
-    fromConfig.getBucket(bucketName, delimiter)
+    fromApplication.getBucket(bucketName, delimiter)
 
   /**
    * Utility method to create an url
    */
   def url(bucketName: String, path: String, expires: Int)(implicit app: Application) =
-    fromConfig.url(bucketName, path, expires)
+    fromApplication.url(bucketName, path, expires)
 
 }
 
@@ -65,10 +69,13 @@ class S3(val client:S3Client) {
    * @see Bucket.add
    */
   def put(bucketName: String, bucketFile: BucketFile): Future[WSResponse] = {
+    // The comment in the commit was: Don’t use ContentTypeOf in play-ws
+    // It's unclear what the underlying reason is
+    // https://github.com/playframework/playframework/commit/56ec574eda926496cc736905102f9637c6466132#diff-de5b238615b352ff9143bbb102be70a3
+    import play.api.libs.iteratee.Execution.Implicits.trampoline
+    implicit val writeable:Writeable[Array[Byte]] = Writeable(identity, Some(bucketFile.contentType))
+
     val acl = bucketFile.acl getOrElse PUBLIC_READ
-
-    implicit val fileContentType = ContentTypeOf[Array[Byte]](Some(bucketFile.contentType))
-
     val headers = (bucketFile.headers getOrElse Map.empty).toList
 
     client
@@ -202,17 +209,18 @@ class S3(val client:S3Client) {
   def initiateMultipartUpload(bucketName: String, bucketFile: BucketFile): Future[WSResponse] = {
     require(bucketFile.content.isEmpty, "The given file should not contain content")
 
+    // see comment in put method
+    import play.api.libs.iteratee.Execution.Implicits.trampoline
+    implicit val writeable:Writeable[Array[Byte]] = Writeable(identity, Some(bucketFile.contentType))
+
     val acl = bucketFile.acl getOrElse PUBLIC_READ
-
-    implicit val fileContentType = ContentTypeOf[String](Some(bucketFile.contentType))
-
     val headers = (bucketFile.headers getOrElse Map.empty).toList
 
     client
       .resourceRequest(bucketName, bucketFile.name)
       .withHeaders("X-Amz-acl" -> acl.value :: headers: _*)
       .withQueryString("uploads" -> "")
-      .post("")
+      .post(Array.empty[Byte])
   }
 
   /**
@@ -273,4 +281,3 @@ class S3(val client:S3Client) {
       .post(body)
   }
 }
-

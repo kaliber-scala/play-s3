@@ -5,6 +5,7 @@ import org.specs2.mutable.Specification
 import play.api.Play.current
 import play.api.test.FakeApplication
 import play.api.test.Helpers._
+import play.api.Application
 
 object AwsCredentialsSpec extends Specification {
 
@@ -21,12 +22,22 @@ object AwsCredentialsSpec extends Specification {
 
   "AwsCredentials" should {
 
+    "retrieve from application" in app {
+      AwsCredentials.fromApplication must_== AwsCredentials("testKey", "testSecret")
+    }
+
+    "load prefixed from application" in app {
+      AwsCredentials.fromApplication("alt") must_== AwsCredentials("altKey","altSecret")
+    }
+
     "retrieve from configuration" in app {
-      AwsCredentials.fromConfiguration must_== AwsCredentials("testKey", "testSecret")
+      val config = implicitly[Application].configuration
+      AwsCredentials.fromConfiguration(config) must_== AwsCredentials("testKey", "testSecret")
     }
 
     "load prefixed from configuration" in app {
-      AwsCredentials.fromConfiguration("alt") must_== AwsCredentials("altKey","altSecret")
+      val config = implicitly[Application].configuration
+      AwsCredentials.fromConfiguration("alt", config) must_== AwsCredentials("altKey","altSecret")
     }
 
     "implement unapply" in app {

@@ -12,7 +12,7 @@ import fly.play.aws.policy.Condition
 import fly.play.aws.policy.PolicyBuilder
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import play.api.libs.ws.WSRequestHolder
+import play.api.libs.ws.WSRequest
 
 class Aws4Signer(
   val credentials: AwsCredentials,
@@ -25,7 +25,7 @@ class Aws4Signer(
 
   private val AwsCredentials(accessKeyId, secretKey, token) = credentials
 
-  def sign(request: WSRequestHolder, method: String, body: Array[Byte]): WSRequestHolder =
+  def sign(request: WSRequest, method: String, body: Array[Byte]): WSRequest =
     addAuthorizationHeaders(request, method, body)
 
   def createPolicy(policyBuilder: PolicyBuilder): AwsPolicy = {
@@ -91,7 +91,7 @@ class Aws4Signer(
     lazy val credentials = accessKeyId + "/" + value
   }
 
-  private def addAuthorizationHeaders(wsRequest: WSRequestHolder, method: String, body: Array[Byte]): WSRequestHolder = {
+  private def addAuthorizationHeaders(wsRequest: WSRequest, method: String, body: Array[Byte]): WSRequest = {
     val request = AwsRequest(
       method,
       wsRequest.url,

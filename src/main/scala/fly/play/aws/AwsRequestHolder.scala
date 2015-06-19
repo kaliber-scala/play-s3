@@ -1,6 +1,6 @@
 package fly.play.aws
 
-import play.api.libs.ws.WSRequestHolder
+import play.api.libs.ws.WSRequest
 import play.api.libs.ws.WSSignatureCalculator
 import play.api.libs.ws.WSAuthScheme
 import play.api.libs.ws.WSBody
@@ -18,7 +18,7 @@ import java.io.File
 import play.api.libs.ws.EmptyBody
 import play.api.libs.iteratee.Iteratee
 
-case class AwsRequestHolder(wrappedRequest: WSRequestHolder, signer: AwsSigner) extends WSRequestHolder {
+case class AwsRequestHolder(wrappedRequest: WSRequest, signer: AwsSigner) extends WSRequest {
 
   def stream(): Future[(WSResponseHeaders, Enumerator[Array[Byte]])] =
     sign(method).flatMap(_.stream())
@@ -59,33 +59,33 @@ case class AwsRequestHolder(wrappedRequest: WSRequestHolder, signer: AwsSigner) 
   val url = wrappedRequest.url
   val virtualHost = wrappedRequest.virtualHost
 
-  def sign(calc: WSSignatureCalculator): WSRequestHolder =
+  def sign(calc: WSSignatureCalculator): WSRequest =
     copy(wrappedRequest = wrappedRequest sign calc)
 
-  def withAuth(username: String, password: String, scheme: WSAuthScheme): WSRequestHolder =
+  def withAuth(username: String, password: String, scheme: WSAuthScheme): WSRequest =
     copy(wrappedRequest = wrappedRequest.withAuth(username, password, scheme))
 
-  def withBody(body: WSBody): WSRequestHolder =
+  def withBody(body: WSBody): WSRequest =
     copy(wrappedRequest = wrappedRequest withBody body)
 
-  def withFollowRedirects(follow: Boolean): WSRequestHolder =
+  def withFollowRedirects(follow: Boolean): WSRequest =
     copy(wrappedRequest = wrappedRequest withFollowRedirects follow)
 
-  def withHeaders(hdrs: (String, String)*): WSRequestHolder =
+  def withHeaders(hdrs: (String, String)*): WSRequest =
     copy(wrappedRequest = wrappedRequest withHeaders (hdrs: _*))
 
-  def withMethod(method: String): WSRequestHolder =
+  def withMethod(method: String): WSRequest =
     copy(wrappedRequest = wrappedRequest withMethod method)
 
-  def withProxyServer(proxyServer: WSProxyServer): WSRequestHolder =
+  def withProxyServer(proxyServer: WSProxyServer): WSRequest =
     copy(wrappedRequest = wrappedRequest withProxyServer proxyServer)
 
-  def withQueryString(parameters: (String, String)*): WSRequestHolder =
+  def withQueryString(parameters: (String, String)*): WSRequest =
     copy(wrappedRequest = wrappedRequest withQueryString (parameters: _*))
 
-  def withRequestTimeout(timeout: Int): WSRequestHolder =
+  def withRequestTimeout(timeout: Long): WSRequest =
     copy(wrappedRequest = wrappedRequest withRequestTimeout timeout)
 
-  def withVirtualHost(vh: String): WSRequestHolder =
+  def withVirtualHost(vh: String): WSRequest =
     copy(wrappedRequest = wrappedRequest withVirtualHost vh)
 }

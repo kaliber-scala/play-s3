@@ -1,4 +1,4 @@
-Amazon Simple Storage Service (S3) module for Play 2.3
+Amazon Simple Storage Service (S3) module for Play 2.4
 =====================================================
 
 A minimal S3 API wrapper. Allows you to list, get, add and remove items from a bucket.
@@ -7,12 +7,22 @@ Has some extra features that help with direct upload and authenticated url gener
 
 **Note: this version uses the new aws 4 signer, this requires you to correctly set the region**
 
+Important changes
+-----------------
+**7.0.0**
+ - Organisation has been changed to 'net.kaliber'
+ - Resolver (maven repository) has been moved
+ - `fromConfig` and `fromConfiguration` methods have been renamed to `fromApplication`. Added `fromConfiguration`
+   methods that can be used without access to an application (useful for application loaders introduced in Play 2.4)
 
 Installation
 ------------
 
 ``` scala
   val appDependencies = Seq(
+    "net.kaliber" %% "play-s3" % "7.0.0"
+
+    // use the following version for play 2.3
     "nl.rhinofly" %% "play-s3" % "6.0.0"
     // use the following version for play 2.2
     //"nl.rhinofly" %% "play-s3" % "4.0.0"
@@ -20,9 +30,11 @@ Installation
     //"nl.rhinofly" %% "play-s3" % "3.1.1"
   )
 
-  val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA).settings(
-    resolvers += "Rhinofly Internal Repository" at "http://maven-repository.rhinofly.net:8081/artifactory/libs-release-local"
-  )
+    // use the following for play 2.4
+  resolvers += "Kaliber Internal Repository" at "https://jars.kaliber.io/artifactory/libs-release-local"
+
+  // use the following for play 2.3 and below
+  resolvers += "Rhinofly Internal Repository" at "http://maven-repository.rhinofly.net:8081/artifactory/libs-release-local"
 ```
 
 Configuration
