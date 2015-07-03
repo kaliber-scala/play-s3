@@ -1,6 +1,6 @@
 package fly.play.s3
 
-import fly.play.aws.xml.AwsResponse
+import fly.play.aws.AwsResponse
 import play.api.libs.ws.WSResponse
 
 object S3Response {

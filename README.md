@@ -43,10 +43,11 @@ implementation (like riakCS), you can customize the domain name and https usage 
 s3.region="eu-west-1"
 #default is determined by the region, see: http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 s3.host="your.domain.name"
-#default is false
-s3.https=true
-#default is false
-s3.pathStyleAccess=true
+#default is true
+s3.https=false
+#default is true
+#required in case dots are present in the bucket name and https is enabled
+s3.pathStyleAccess=false
 ```
 
 Usage
@@ -56,13 +57,6 @@ Getting a bucket:
 
 ``` scala
 val bucket = S3("bucketName")
-
-//with other credentials
-implicit val credentials = ...
-val bucket = S3("bucketName")
-
-//or
-val bucket = S3("bucketName")(credentials)
 ```
 
 Adding a file:
@@ -189,6 +183,7 @@ val policy =
       successActionRedirect eq expectedRedirectUrl,
       header(CONTENT_TYPE) startsWith "text/",
       meta("tag").any)
+    .toPolicy
 
 // import Form helper
 import fly.play.s3.upload.Form

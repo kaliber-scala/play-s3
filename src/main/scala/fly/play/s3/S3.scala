@@ -1,54 +1,26 @@
 package fly.play.s3
 
 import scala.concurrent.Future
-import fly.play.aws.Aws
-import fly.play.aws.auth.AwsCredentials
 import play.api.http.ContentTypeOf
-import fly.play.aws.auth.Aws4Signer
-import fly.play.aws.auth.Signer
 import play.api.libs.ws.WS
-import play.api.Play.current
 import play.api.http.Writeable
 import play.api.libs.ws.WSResponse
+import play.api.Application
 
 /**
  * Amazon Simple Storage Service
  */
 object S3 {
 
-  @deprecated("The minimal part size is not checked anymore, this variable will be removed", "3.3.1")
-  val MINIMAL_PART_SIZE = 5 * 1024 * 1024
-
-  def config = current.configuration
-
-  val regionEndpoints = Map(
-      "us-east-1" -> "s3.amazonaws.com",
-      "us-west-1" -> "s3-us-west-1.amazonaws.com",
-      "us-west-2" -> "s3-us-west-2.amazonaws.com",
-      "eu-west-1" -> "s3-eu-west-1.amazonaws.com",
-      "ap-southeast-1" -> "s3-ap-southeast-1.amazonaws.com",
-      "ap-southeast-2" ->  "s3-ap-southeast-2.amazonaws.com",
-      "ap-northeast-1" -> "s3-ap-northeast-1.amazonaws.com",
-      "sa-east-1" -> "s3-sa-east-1.amazonaws.com"
-  )
-
-  def https = config getBoolean "s3.https" getOrElse false
-
-  def pathStyleAccess = config getBoolean "s3.pathStyleAccess" getOrElse false
-
-  def host = config getString "s3.host" getOrElse regionEndpoints(region)
-
-  def region = config getString "s3.region" getOrElse "us-east-1"
-
-  def fromConfig(implicit credentials: AwsCredentials) =
-    new S3(https, host, region, pathStyleAccess)
+  def fromConfig(implicit app: Application) =
+    new S3(S3Client(WS.client, S3Configuration.fromConfig))
 
   /**
    * Utility method to create a bucket.
    *
    * @see Bucket
    */
-  def apply(bucketName: String)(implicit credentials: AwsCredentials): Bucket =
+  def apply(bucketName: String)(implicit app: Application): Bucket =
     fromConfig.getBucket(bucketName)
 
   /**
@@ -56,21 +28,18 @@ object S3 {
    *
    * @see Bucket
    */
-  def apply(bucketName: String, delimiter: String)(implicit credentials: AwsCredentials): Bucket =
+  def apply(bucketName: String, delimiter: String)(implicit app: Application): Bucket =
     fromConfig.getBucket(bucketName, delimiter)
 
   /**
    * Utility method to create an url
    */
-  def url(bucketName: String, path: String, expires: Int)(implicit credentials: AwsCredentials) =
+  def url(bucketName: String, path: String, expires: Int)(implicit app: Application) =
     fromConfig.url(bucketName, path, expires)
 
 }
 
-class S3(val https: Boolean, val host: String, val region: String, val pathStyleAccess: Boolean = false)(implicit val credentials: AwsCredentials) {
-
-  lazy val signer = new S3Signer(credentials, region)
-  lazy val awsWithSigner = Aws withSigner signer
+class S3(val client:S3Client) {
 
   /**
    * Utility method to create a bucket.
@@ -87,13 +56,6 @@ class S3(val https: Boolean, val host: String, val region: String, val pathStyle
   def getBucket(bucketName: String, delimiter: String): Bucket =
     Bucket(bucketName, Some(delimiter), this)
 
-  protected[s3] def httpUrl(bucketName: String, path: String) = {
-    val protocol = if (https) "https" else "http"
-
-    if (pathStyleAccess) s"$protocol://$host/$bucketName/$path"
-    else s"$protocol://$bucketName.$host/$path"
-  }
-
   /**
    * Lowlevel method to call put on a bucket in order to store a file
    *
@@ -109,26 +71,24 @@ class S3(val https: Boolean, val host: String, val region: String, val pathStyle
 
     val headers = (bucketFile.headers getOrElse Map.empty).toList
 
-    awsWithSigner
-      .url(httpUrl(bucketName, bucketFile.name))
+    client
+      .resourceRequest(bucketName, bucketFile.name)
       .withHeaders("X-Amz-acl" -> acl.value :: headers: _*)
       .put(bucketFile.content)
   }
 
-  def putAcl(bucketName: String, sourcePath: String, acl: ACL): Future[WSResponse] = {
-    awsWithSigner
-      .url(httpUrl(bucketName, sourcePath))
+  def putAcl(bucketName: String, sourcePath: String, acl: ACL): Future[WSResponse] =
+    client
+      .resourceRequest(bucketName, sourcePath)
       .withQueryString("acl" -> "")
       .withHeaders("X-Amz-acl" -> acl.value)
-      .put
-  }
+      .put("")
 
-  def getAcl(bucketName: String, sourcePath: String): Future[WSResponse] = {
-    awsWithSigner
-      .url(httpUrl(bucketName, sourcePath))
+  def getAcl(bucketName: String, sourcePath: String): Future[WSResponse] =
+    client
+      .resourceRequest(bucketName, sourcePath)
       .withQueryString("acl" -> "")
       .get
-  }
 
   /**
    * Lowlevel method to call get on a bucket or a specific file
@@ -149,13 +109,27 @@ class S3(val https: Boolean, val host: String, val region: String, val pathStyle
   def get(bucketName: String, path: Option[String], prefix: Option[String],
     delimiter: Option[String], marker: Option[String]): Future[WSResponse] =
 
-    awsWithSigner
-      .url(httpUrl(bucketName, path.getOrElse("")))
+    client
+      .resourceRequest(bucketName, path.getOrElse(""))
       .withQueryString(
         (prefix.map("prefix" -> _).toList :::
           delimiter.map("delimiter" -> _).toList :::
           marker.map("marker" -> _).toList): _*)
       .get
+
+  /**
+   * Lowlevel method to call head on a specific file
+   *
+   * @param bucketName  The name of the bucket
+   * @param path        The path that you want to call the get on
+   *
+   * @see Bucket.getHeadersOf
+   */
+  def head(bucketName: String, path: String): Future[WSResponse] =
+
+    client
+      .resourceRequest(bucketName, path)
+      .head
 
   /**
    * Lowlevel method to call delete on a bucket in order to delete a file
@@ -166,8 +140,8 @@ class S3(val https: Boolean, val host: String, val region: String, val pathStyle
    * @see Bucket.remove
    */
   def delete(bucketName: String, path: String): Future[WSResponse] =
-    awsWithSigner
-      .url(httpUrl(bucketName, path))
+    client
+      .resourceRequest(bucketName, path)
       .delete
 
   /**
@@ -179,11 +153,11 @@ class S3(val https: Boolean, val host: String, val region: String, val pathStyle
    *
    * @see Bucket.url
    */
-  def url(bucketName: String, path: String, expires: Int): String = {
+  def url(bucketName: String, path: String, expires: Int, method: String = "GET"): String = {
 
     val queryString = Map.empty[String, Seq[String]]
 
-    awsWithSigner.signer.signUrl(url(bucketName, path), expires, queryString)
+    client.signer.signUrl(method, url(bucketName, path), expires, queryString)
   }
 
   /**
@@ -193,7 +167,7 @@ class S3(val https: Boolean, val host: String, val region: String, val pathStyle
    * @param path the path of the file we want to create a url for
    */
   def url(bucketName: String, path: String): String =
-    httpUrl(bucketName, path)
+    client.resourceUrl(bucketName, path)
 
   /**
    * Lowlevel method to copy a file on S3
@@ -206,14 +180,15 @@ class S3(val https: Boolean, val host: String, val region: String, val pathStyle
    *
    * @see Bucket.rename
    */
-  def putCopy(sourceBucketName: String, sourcePath: String, destinationBucketName: String, destinationPath: String, acl: ACL): Future[WSResponse] = {
+  def putCopy(sourceBucketName: String, sourcePath: String, destinationBucketName: String, destinationPath: String, acl: ACL, headers: Map[String, String] = Map.empty): Future[WSResponse] = {
     val source = "/" + sourceBucketName + "/" + sourcePath
 
-    awsWithSigner
-      .url(httpUrl(destinationBucketName, destinationPath))
+    client
+      .resourceRequest(destinationBucketName, destinationPath)
       .withHeaders("X-Amz-acl" -> acl.value)
       .withHeaders("X-Amz-copy-source" -> source)
-      .put
+      .withHeaders(headers.toSeq: _*)
+      .put("")
   }
 
   /**
@@ -233,8 +208,8 @@ class S3(val https: Boolean, val host: String, val region: String, val pathStyle
 
     val headers = (bucketFile.headers getOrElse Map.empty).toList
 
-    awsWithSigner
-      .url(httpUrl(bucketName, bucketFile.name))
+    client
+      .resourceRequest(bucketName, bucketFile.name)
       .withHeaders("X-Amz-acl" -> acl.value :: headers: _*)
       .withQueryString("uploads" -> "")
       .post("")
@@ -250,8 +225,8 @@ class S3(val https: Boolean, val host: String, val region: String, val pathStyle
    */
   def abortMultipartUpload(bucketName: String, uploadTicket: BucketFileUploadTicket): Future[WSResponse] = {
 
-    awsWithSigner
-      .url(httpUrl(bucketName, uploadTicket.name))
+    client
+      .resourceRequest(bucketName, uploadTicket.name)
       .withQueryString(
         "uploadId" -> uploadTicket.uploadId)
       .delete
@@ -270,8 +245,8 @@ class S3(val https: Boolean, val host: String, val region: String, val pathStyle
     require(bucketFilePart.partNumber > 0, "The partNumber must be greater than 0")
     require(bucketFilePart.partNumber < 10001, "The partNumber must be lesser than 10001")
 
-    awsWithSigner
-      .url(httpUrl(bucketName, uploadTicket.name))
+    client
+      .resourceRequest(bucketName, uploadTicket.name)
       .withQueryString(
         "partNumber" -> bucketFilePart.partNumber.toString,
         "uploadId" -> uploadTicket.uploadId)
@@ -291,8 +266,8 @@ class S3(val https: Boolean, val host: String, val region: String, val pathStyle
   def completeMultipartUpload(bucketName: String, uploadTicket: BucketFileUploadTicket, partUploadTickets: Seq[BucketFilePartUploadTicket]): Future[WSResponse] = {
     val body = <CompleteMultipartUpload>{ partUploadTickets.map(_.toXml) }</CompleteMultipartUpload>
 
-    awsWithSigner
-      .url(httpUrl(bucketName, uploadTicket.name))
+    client
+      .resourceRequest(bucketName, uploadTicket.name)
       .withQueryString(
         "uploadId" -> uploadTicket.uploadId)
       .post(body)

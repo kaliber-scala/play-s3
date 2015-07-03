@@ -1,4 +1,4 @@
-package fly.play.s3
+package fly.play.aws
 
 import scala.xml.Elem
 import scala.xml.Text

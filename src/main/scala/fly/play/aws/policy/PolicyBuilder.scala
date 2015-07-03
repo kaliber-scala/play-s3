@@ -1,18 +1,14 @@
-package fly.play.s3.upload
+package fly.play.aws.policy
 
 import java.util.Date
-
-import scala.language.implicitConversions
-
-import fly.play.aws.Aws.dates.iso8601DateFormat
+import fly.play.aws.AwsDates.iso8601DateFormat
 import fly.play.s3.ACL
-import fly.play.s3.S3Signer
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
-import play.api.libs.json.Json.toJsFieldJsValueWrapper
 import play.api.libs.json.Writes
+import fly.play.aws.AwsSigner
 
-case class PolicyBuilder(expiration: Date, conditions: Seq[Condition] = Seq.empty)(implicit val signer: S3Signer) {
+case class PolicyBuilder(expiration: Date, conditions: Seq[Condition] = Seq.empty)(implicit val signer: AwsSigner) {
 
   def withConditions(conditions: Condition*) =
     this.copy(conditions = this.conditions ++ conditions)
@@ -21,35 +17,8 @@ case class PolicyBuilder(expiration: Date, conditions: Seq[Condition] = Seq.empt
     Json.obj(
       "expiration" -> iso8601DateFormat.format(expiration),
       "conditions" -> conditions)
-
-  lazy val encoded =
-    signer.base64Encode(json.toString.getBytes(signer.DEFAULT_ENCODING))
-
-  lazy val signature = signer.sign(encoded)
-
-  def withSignerConditions = {
-    val scope = signer.Scope(new Date)
-
-    import Condition.string
-
-    val amzDate = signer.amzDate(scope)
-    val amzAlgorithm = signer.amzAlgorithm
-    val amzCredential = signer.amzCredential(scope)
-
-    implicit def toCondition(p: (String, Seq[String])): Condition = p._1 -> p._2.head
-
-    withConditions(
-      amzAlgorithm,
-      amzCredential,
-      amzDate)
-  }
-
-}
-
-object PolicyBuilder {
-
-  def apply(bucketName: String, expiration: Date)(implicit signer: S3Signer): PolicyBuilder =
-    new PolicyBuilder(expiration).withConditions(Condition.string("bucket") eq bucketName)
+      
+  def toPolicy:AwsPolicy = signer createPolicy this
 }
 
 trait Condition {
@@ -94,6 +63,8 @@ object Condition {
 
   implicit val writes: Writes[Condition] = Writes[Condition](_.json)
 
+  import scala.language.implicitConversions
+  
   implicit def fromTuple(t: (String, String)): Eq = Eq(t._1, t._2)
 
   val acl =
