@@ -27,9 +27,9 @@ object S3Configuration {
     val config = app.configuration
 
     val region = config getString "s3.region" getOrElse "us-east-1"
-    val https = config getBoolean "s3.https" getOrElse false
+    val https = config getBoolean "s3.https" getOrElse true
     val host = config getString "s3.host" getOrElse regionEndpoints(region)
-    val pathStyleAccess = config getBoolean "s3.pathStyleAccess" getOrElse false
+    val pathStyleAccess = config getBoolean "s3.pathStyleAccess" getOrElse true
 
     S3Configuration(AwsCredentials.fromConfiguration, region, https, host, pathStyleAccess)
   }

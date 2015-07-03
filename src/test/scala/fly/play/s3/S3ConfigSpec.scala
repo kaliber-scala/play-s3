@@ -5,13 +5,13 @@ import play.api.test.Helpers.running
 import play.api.Play.current
 
 class S3ConfigSpec extends S3SpecSetup {
-  
+
   sequential
-  
+
   "S3" should {
 
     def config = S3Configuration.fromConfig
-    
+
     "have the correct default value for host" in {
       running(fakeApplication(Map("s3.host" -> null, "s3.region" -> null))) {
         config.host === "s3.amazonaws.com"
@@ -19,7 +19,7 @@ class S3ConfigSpec extends S3SpecSetup {
     }
 
     "have the correct default value for https" inApp {
-      config.https === false
+      config.https === true
     }
 
     "have the correct default value for region" in {
@@ -35,8 +35,8 @@ class S3ConfigSpec extends S3SpecSetup {
     }
 
     "get the correct value for https from the configuration" in {
-      running(fakeApplication(Map("s3.https" -> true))) {
-        config.https === true
+      running(fakeApplication(Map("s3.https" -> false))) {
+        config.https === false
       }
     }
 
@@ -53,17 +53,17 @@ class S3ConfigSpec extends S3SpecSetup {
     }
 
     "have the correct default value for pathStyleAccess " inApp {
-      config.pathStyleAccess === false
+      config.pathStyleAccess === true
     }
 
     "build a url with the bucket name as part of the host name when pathStyleAccess is false" inApp {
-      s3WithCredentials.url("test.bucket", "test") === "http://test.bucket.s3-eu-west-1.amazonaws.com/test"
+      running(fakeApplication(Map("s3.pathStyleAccess" -> false))) {
+     		s3WithCredentials.url("test.bucket", "test") === "https://test.bucket.s3-eu-west-1.amazonaws.com/test"
+      }
     }
 
     "build a url with the bucket name as part of the path when pathStyleAccess is true" inApp {
-      running(fakeApplication(Map("s3.pathStyleAccess" -> true))) {
-        s3WithCredentials.url("test.bucket", "test") === "http://s3-eu-west-1.amazonaws.com/test.bucket/test"
-      }
+    	s3WithCredentials.url("test.bucket", "test") === "https://s3-eu-west-1.amazonaws.com/test.bucket/test"
     }
 
     "return an instance of bucket" inApp {
@@ -75,7 +75,7 @@ class S3ConfigSpec extends S3SpecSetup {
       val url = S3.url(testBucketName, "privateREADME.txt", 1234)
       val host = S3Configuration.fromConfig.host
 
-      url must startWith(s"http://$testBucketName.$host/privateREADME.txt")
+      url must startWith(s"https://$host/$testBucketName/privateREADME.txt")
       url must contain("Expires=1234")
     }
 
