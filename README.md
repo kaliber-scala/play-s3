@@ -13,7 +13,7 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "nl.rhinofly" %% "play-s3" % "5.0.2"
+    "nl.rhinofly" %% "play-s3" % "6.0.0"
     // use the following version for play 2.2
     //"nl.rhinofly" %% "play-s3" % "4.0.0"
     // use the following version for play 2.1
