@@ -1,6 +1,6 @@
 name := "play-s3"
 
-version := "6.0.0-RC1"
+version := "6.0.0"
 
 organization := "nl.rhinofly"
 

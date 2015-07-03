@@ -117,7 +117,15 @@ class S3(val client:S3Client) {
           marker.map("marker" -> _).toList): _*)
       .get
 
-  def getHeadersOf(bucketName: String, path: String): Future[WSResponse] =
+  /**
+   * Lowlevel method to call head on a specific file
+   *
+   * @param bucketName  The name of the bucket
+   * @param path        The path that you want to call the get on
+   *
+   * @see Bucket.getHeadersOf
+   */
+  def head(bucketName: String, path: String): Future[WSResponse] =
 
     client
       .resourceRequest(bucketName, path)

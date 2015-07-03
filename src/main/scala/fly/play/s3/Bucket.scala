@@ -73,8 +73,13 @@ case class Bucket(
         Some(headers))
     }
 
+  /**
+   * Retrueves the headers of a single item.
+   *
+   * @param itemName  The name of the item you want to receive the headers from
+   */
   def getHeadersOf(itemName: String): Future[Map[String, Seq[String]]] =
-    s3.getHeadersOf(name, itemName) map (_.allHeaders)
+    s3.head(name, itemName) map (_.allHeaders)
 
   /**
    * Lists the contents of the bucket
