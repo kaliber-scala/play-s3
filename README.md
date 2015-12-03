@@ -20,7 +20,7 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "net.kaliber" %% "play-s3" % "7.0.1"
+    "net.kaliber" %% "play-s3" % "7.0.2"
 
     // use the following version for play 2.3
     "nl.rhinofly" %% "play-s3" % "6.0.0"
