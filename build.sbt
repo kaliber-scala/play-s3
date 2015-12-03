@@ -9,9 +9,9 @@ crossScalaVersions := Seq("2.10.4", "2.11.6")
 releaseCrossBuild := true
 
 libraryDependencies ++= Seq(
-  "com.typesafe.play" %% "play-ws" % "2.4.0",
-  "com.typesafe.play" %% "play-test" % "2.4.0" % "test",
-  "org.specs2" %% "specs2-core" % "3.6.1" % "test"
+  "com.typesafe.play" %% "play-ws"     % "2.4.0" % "provided",
+  "com.typesafe.play" %% "play-test"   % "2.4.0" % "test",
+  "org.specs2"        %% "specs2-core" % "3.6.1" % "test"
 )
 
 publishTo := {
@@ -28,13 +28,8 @@ resolvers ++= Seq(
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
-
 // https://github.com/playframework/playframework/issues/4827
 
 fork in Test := true
 
-javaOptions in Test ++= Seq(
-  "-Dconfig.file=test/conf/application.conf"
-)
-
-
+javaOptions in Test += "-Dconfig.file=test/conf/application.conf"
