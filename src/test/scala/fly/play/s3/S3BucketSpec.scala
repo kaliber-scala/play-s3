@@ -177,6 +177,16 @@ class S3BucketSpec extends S3SpecSetup {
       noException(result)
     }
 
+    "be able to copy (clone) a file" inApp {
+
+      val result = testBucket clone ("private2README.txt", "copyTest.txt", AUTHENTICATED_READ)
+      noException(result)
+    }
+
+    "<cleanup of the file>" inApp {
+      noException(testBucket remove "copyTest.txt")
+    }
+
     "be able to retrieve the headers of a file" inApp {
       val fileName = "headerTest.txt"
 
@@ -189,10 +199,7 @@ class S3BucketSpec extends S3SpecSetup {
     }
 
     "<cleanup of the file>" inApp {
-      // cleanup
-      await(testBucket remove "headerTest.txt")
-
-      success
+      noException(testBucket remove "headerTest.txt")
     }
 
     "be able to rename a file while passing new headers" inApp {
@@ -216,10 +223,7 @@ class S3BucketSpec extends S3SpecSetup {
     }
 
      "<cleanup of the file>" inApp {
-      // cleanup
-      await(testBucket remove "testHeaders2.txt")
-
-      success
+      noException(testBucket remove "testHeaders2.txt")
     }
 
     "be able to change the file's ACL" inApp {
@@ -401,9 +405,7 @@ class S3BucketSpec extends S3SpecSetup {
           case Seq(BucketItem(itemName, false)) => itemName === (prefix + name)
         }
 
-        await(testBucket - AwsUrlEncoder.encodePath(prefix + name))
-
-        success
+        noException(testBucket - AwsUrlEncoder.encodePath(prefix + name))
       }
 
       uploadListAndRemoveFileWithName("sample/", "test file.txt")
@@ -484,9 +486,8 @@ class S3BucketSpec extends S3SpecSetup {
       }
 
       "<cleanup of the file>" inApp {
-        await(testBucket remove target1)
-        await(testBucket remove target2)
-        success
+        noException(testBucket remove target1)
+        noException(testBucket remove target2)
       }
     }
   }

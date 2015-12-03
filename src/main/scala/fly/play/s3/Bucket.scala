@@ -157,6 +157,19 @@ case class Bucket(
   }
 
   /**
+   * Allows you to copy a file within this bucket.
+   *
+   * Note that copying a file removes the `server-side-encryption`, `storage-class`,
+   * and `website-redirect-location` metadata.
+   *
+   * @param sourceItemName			The source name of the item
+   * @param destinationItemName		The destination name of the item
+   * @param acl						The ACL for the new item, default is PUBLIC_READ
+   */
+  def clone(sourceItemName: String, destinationItemName: String, acl: ACL = PUBLIC_READ, headers: Map[String, String] = Map.empty): Future[Unit] =
+    s3.putCopy(name, sourceItemName, name, destinationItemName, acl, headers) map unitResponse
+
+  /**
    * Initiates a multipart upload
    *
    * @param bucketFile	A representation of the file
