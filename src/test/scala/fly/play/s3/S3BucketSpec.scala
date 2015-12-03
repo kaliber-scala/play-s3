@@ -463,5 +463,31 @@ class S3BucketSpec extends S3SpecSetup {
       filesAvailable1.size === sizeBeforeAddingItems + amount
       filesAvailable2.size === sizeBeforeAddingItems + amount
     }
+
+    "correctly rename files into nested directories" >> {
+
+      val source1 = "renameTest1.txt"
+      val source2 = "renameTest2.txt"
+      val target1 = "d1/" + source1
+      val target2 = "d2/d3/" + source2
+
+      "single directory" inApp {
+        await(testBucket add BucketFile(source1, "text/plain", "test rename 1".getBytes, Some(AUTHENTICATED_READ)))
+
+        noException(testBucket.rename(source1, target1, AUTHENTICATED_READ))
+      }
+
+      "nested directory" inApp {
+        await(testBucket add BucketFile(source2, "text/plain", "test rename 2".getBytes, Some(AUTHENTICATED_READ)))
+
+        noException(testBucket.rename(source2, target2, AUTHENTICATED_READ))
+      }
+
+      "<cleanup of the file>" inApp {
+        await(testBucket remove target1)
+        await(testBucket remove target2)
+        success
+      }
+    }
   }
 }
