@@ -1,27 +1,23 @@
 package fly.play.aws
 
-import play.api.libs.ws.WSRequest
-import play.api.libs.ws.WSSignatureCalculator
-import play.api.libs.ws.WSAuthScheme
-import play.api.libs.ws.WSBody
-import play.api.libs.ws.WSResponseHeaders
-import scala.concurrent.Future
-import play.api.libs.iteratee.Enumerator
-import play.api.libs.ws.WSResponse
-import play.api.libs.ws.WSProxyServer
-import play.api.libs.concurrent.Execution.Implicits._
-import play.api.libs.ws.StreamedBody
-import play.api.libs.ws.InMemoryBody
-import java.io.RandomAccessFile
-import play.api.libs.ws.FileBody
 import java.io.File
-import play.api.libs.ws.EmptyBody
+import java.io.RandomAccessFile
+
+import play.api.libs.concurrent.Execution.Implicits._
+import play.api.libs.iteratee.Enumerator
 import play.api.libs.iteratee.Iteratee
+import play.api.libs.ws._
+
+import scala.concurrent.Future
+import scala.concurrent.duration.Duration
 
 case class AwsRequestHolder(wrappedRequest: WSRequest, signer: AwsSigner) extends WSRequest {
 
-  def stream(): Future[(WSResponseHeaders, Enumerator[Array[Byte]])] =
+  def stream(): Future[StreamedResponse] =
     sign(method).flatMap(_.stream())
+
+  def streamWithEnumerator(): Future[(WSResponseHeaders, Enumerator[Array[Byte]])] =
+    sign(method).flatMap(_.streamWithEnumerator())
 
   def execute(): Future[WSResponse] =
     sign(method).flatMap(_.execute())
@@ -34,8 +30,8 @@ case class AwsRequestHolder(wrappedRequest: WSRequest, signer: AwsSigner) extend
 
   private def getBodyFromRequest: Future[Array[Byte]] =
     wrappedRequest.body match {
-      case InMemoryBody(bytes)      => Future successful bytes
-      case StreamedBody(enumerator) => enumerator run Iteratee.consume[Array[Byte]]()
+      case InMemoryBody(bytes)      => Future successful bytes.toArray
+      case StreamedBody(source)     => Future successful ???
       case FileBody(file)           => Future successful fileToByteArray(file)
       case EmptyBody                => Future successful Array.empty[Byte]
     }
@@ -84,8 +80,14 @@ case class AwsRequestHolder(wrappedRequest: WSRequest, signer: AwsSigner) extend
     copy(wrappedRequest = wrappedRequest withQueryString (parameters: _*))
 
   def withRequestTimeout(timeout: Long): WSRequest =
-    copy(wrappedRequest = wrappedRequest withRequestTimeout timeout)
+    copy(wrappedRequest = wrappedRequest withRequestTimeout Duration(timeout, "second"))
 
   def withVirtualHost(vh: String): WSRequest =
     copy(wrappedRequest = wrappedRequest withVirtualHost vh)
+
+  def withRequestFilter(filter: WSRequestFilter): WSRequest =
+    copy(wrappedRequest = wrappedRequest withRequestFilter filter)
+
+  def withRequestTimeout(timeout: Duration): WSRequest =
+    copy(wrappedRequest = wrappedRequest withRequestTimeout timeout)
 }
