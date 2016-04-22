@@ -1,17 +1,23 @@
 package fly.play.aws
 
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
+import akka.util.ByteString
 import java.io.File
 import java.io.RandomAccessFile
-
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.iteratee.Enumerator
-import play.api.libs.iteratee.Iteratee
 import play.api.libs.ws._
-
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
 
 case class AwsRequestHolder(wrappedRequest: WSRequest, signer: AwsSigner) extends WSRequest {
+
+  implicit private val actorSystem = ActorSystem("aws-request-holder")
+  implicit private val materializer = ActorMaterializer()
+
+  private val streamedBodySink = Sink.fold[Array[Byte], ByteString](Array.empty[Byte])(_ ++ _)
 
   def stream(): Future[StreamedResponse] =
     sign(method).flatMap(_.stream())
@@ -31,7 +37,7 @@ case class AwsRequestHolder(wrappedRequest: WSRequest, signer: AwsSigner) extend
   private def getBodyFromRequest: Future[Array[Byte]] =
     wrappedRequest.body match {
       case InMemoryBody(bytes)      => Future successful bytes.toArray
-      case StreamedBody(source)     => Future successful ???
+      case StreamedBody(source)     => source.runWith(streamedBodySink)
       case FileBody(file)           => Future successful fileToByteArray(file)
       case EmptyBody                => Future successful Array.empty[Byte]
     }
