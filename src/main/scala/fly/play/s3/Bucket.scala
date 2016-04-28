@@ -68,7 +68,7 @@ case class Bucket(
 
       BucketFile(itemName,
         headers("Content-Type"),
-        response.bodyAsBytes.asByteBuffer.array,
+        response.bodyAsBytes.toArray[Byte],
         None,
         Some(headers))
     }

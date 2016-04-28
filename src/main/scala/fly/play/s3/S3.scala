@@ -15,7 +15,7 @@ import play.api.libs.ws.WSClient
 object S3 {
 
   def fromApplication(implicit app: Application) =
-    fromConfiguration(WS.client, app.configuration)
+    fromConfiguration(app.injector.instanceOf[WSClient], app.configuration)
 
   def fromConfiguration(client: WSClient, configuration: Configuration) =
     new S3(S3Client(client, S3Configuration fromConfiguration configuration))
