@@ -1,5 +1,6 @@
 package fly.play.s3
 
+import akka.util.ByteString
 import scala.concurrent.Future
 import play.api.libs.ws.WS
 import play.api.http.Writeable
@@ -14,7 +15,7 @@ import play.api.libs.ws.WSClient
 object S3 {
 
   def fromApplication(implicit app: Application) =
-    fromConfiguration(WS.client, app.configuration)
+    fromConfiguration(app.injector.instanceOf[WSClient], app.configuration)
 
   def fromConfiguration(client: WSClient, configuration: Configuration) =
     new S3(S3Client(client, S3Configuration fromConfiguration configuration))
@@ -73,7 +74,7 @@ class S3(val client:S3Client) {
     // It's unclear what the underlying reason is
     // https://github.com/playframework/playframework/commit/56ec574eda926496cc736905102f9637c6466132#diff-de5b238615b352ff9143bbb102be70a3
     import play.api.libs.iteratee.Execution.Implicits.trampoline
-    implicit val writeable:Writeable[Array[Byte]] = Writeable(identity, Some(bucketFile.contentType))
+    implicit val writeable:Writeable[Array[Byte]] = Writeable(ByteString.apply, Some(bucketFile.contentType))
 
     val acl = bucketFile.acl getOrElse PUBLIC_READ
     val headers = (bucketFile.headers getOrElse Map.empty).toList
@@ -211,7 +212,7 @@ class S3(val client:S3Client) {
 
     // see comment in put method
     import play.api.libs.iteratee.Execution.Implicits.trampoline
-    implicit val writeable:Writeable[Array[Byte]] = Writeable(identity, Some(bucketFile.contentType))
+    implicit val writeable:Writeable[Array[Byte]] = Writeable(ByteString.apply, Some(bucketFile.contentType))
 
     val acl = bucketFile.acl getOrElse PUBLIC_READ
     val headers = (bucketFile.headers getOrElse Map.empty).toList

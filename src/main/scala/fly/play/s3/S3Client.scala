@@ -1,5 +1,6 @@
 package fly.play.s3
 
+import akka.stream.ActorMaterializer
 import play.api.libs.ws.WSClient
 import play.api.libs.ws.WSRequest
 import fly.play.aws.AwsRequestHolder

@@ -1,17 +1,19 @@
 package fly.play.aws
 
-import com.ning.http.client.AsyncHttpClientConfig
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
+import akka.util.ByteString
 import java.net.URLEncoder
 import java.util.Calendar
 import java.util.Date
 import java.util.TimeZone
+import org.asynchttpclient.DefaultAsyncHttpClientConfig
 import org.specs2.mutable.Specification
 import play.api.http.Writeable
-import play.api.libs.ws.ning.NingWSClient
+import play.api.libs.ws.ahc.AhcWSClient
 import play.api.libs.ws.WSRequest
+
 import scala.collection.mutable
-import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.language.reflectiveCalls
 
 object Aws4SignerSpec extends Specification {
@@ -176,8 +178,7 @@ object Aws4SignerSpec extends Specification {
       val signer = newSigner()
       val body = "Welcome to Amazon S3."
 
-      import play.api.libs.iteratee.Execution.Implicits.trampoline
-      implicit def writeable: Writeable[String] = Writeable(_.getBytes, None)
+      implicit def writeable: Writeable[String] = Writeable(s => ByteString(s.getBytes), None)
       val request =
         WS
           .url("http://examplebucket.s3.amazonaws.com/" + URLEncoder.encode("test$file.text", "UTF-8"))
@@ -389,9 +390,13 @@ object Aws4SignerSpec extends Specification {
 
   object WS {
     def url(url: String) = {
-      val builder = new AsyncHttpClientConfig.Builder()
-      implicit val implicitClient = new NingWSClient(builder.build)
-      play.api.libs.ws.WS.clientUrl(url)
+      val builder = new DefaultAsyncHttpClientConfig.Builder()
+
+      implicit val system = ActorSystem("test")
+      implicit val materializer = ActorMaterializer()
+
+      val client = new AhcWSClient(builder.build)
+      client.url(url)
     }
   }
 }

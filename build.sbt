@@ -9,8 +9,8 @@ crossScalaVersions := Seq("2.10.4", "2.11.6")
 releaseCrossBuild := true
 
 libraryDependencies ++= Seq(
-  "com.typesafe.play" %% "play-ws"     % "2.4.0" % "provided",
-  "com.typesafe.play" %% "play-test"   % "2.4.0" % "test",
+  "com.typesafe.play" %% "play-ws"     % "2.5.0" % "provided",
+  "com.typesafe.play" %% "play-test"   % "2.5.0" % "test",
   "org.specs2"        %% "specs2-core" % "3.6.1" % "test"
 )
 

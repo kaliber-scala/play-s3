@@ -1,8 +1,8 @@
 package fly.play.s3
 
 import java.util.Date
-import scala.collection.JavaConversions.asScalaBuffer
-import scala.collection.JavaConversions.mapAsScalaMap
+
+
 import scala.concurrent.Future
 import scala.xml.Elem
 import fly.play.aws.policy.PolicyBuilder
@@ -14,7 +14,7 @@ import fly.play.aws.policy.Condition
 /**
  * Representation of a bucket
  *
- * @param bucketName	The name of the bucket needed to create a Bucket representation
+ * @param name	The name of the bucket needed to create a Bucket representation
  * @param delimiter		A delimiter to use for this Bucket instance, default is a / (slash)
  *
  */
@@ -52,7 +52,7 @@ case class Bucket(
   /**
    * Utility method to create a policy builder for this bucket
    *
-   * @param expires		The date this policy expires
+   * @param expiration		The date this policy expires
    */
   def uploadPolicy(expiration: Date): PolicyBuilder =
     PolicyBuilder(expiration)(s3.client.signer).withConditions(Condition.string("bucket") eq name)
@@ -68,13 +68,13 @@ case class Bucket(
 
       BucketFile(itemName,
         headers("Content-Type"),
-        response.underlying[com.ning.http.client.Response].getResponseBodyAsBytes,
+        response.bodyAsBytes.toArray[Byte],
         None,
         Some(headers))
     }
 
   /**
-   * Retrueves the headers of a single item.
+   * Retrieves the headers of a single item.
    *
    * @param itemName  The name of the item you want to receive the headers from
    */
@@ -236,8 +236,8 @@ case class Bucket(
 
   private def extractHeaders(response: WSResponse) = {
     for {
-      (key, value) <- response.underlying[com.ning.http.client.Response].getHeaders.toMap
-      if (value.size > 0)
+      (key, value) <- response.allHeaders
+      if value.nonEmpty
     } yield key -> value.head
   }
 
@@ -249,9 +249,9 @@ case class Bucket(
 
       val isTruncated = (xml \ "IsTruncated").text == "true"
 
-      var items = /* files */ (xml \ "Contents").map(n => BucketItem((n \ "Key").text, false))
+      var items = /* files */ (xml \ "Contents").map(n => BucketItem((n \ "Key").text, isVirtual = false))
       if (delimiter.isDefined)
-        items ++= /* folders */ (xml \ "CommonPrefixes").map(n => BucketItem((n \ "Prefix").text, true))
+        items ++= /* folders */ (xml \ "CommonPrefixes").map(n => BucketItem((n \ "Prefix").text, isVirtual = true))
 
       val nextMarker =
         if (isTruncated)
