@@ -29,17 +29,7 @@ Installation
     "net.kaliber" %% "play-s3" % "7.0.2"
     // use the following version for play 2.3
     "nl.rhinofly" %% "play-s3" % "6.0.0"
-    // use the following version for play 2.2
-    //"nl.rhinofly" %% "play-s3" % "4.0.0"
-    // use the following version for play 2.1
-    //"nl.rhinofly" %% "play-s3" % "3.1.1"
   )
-
-    // use the following for play 2.4
-  resolvers += "Kaliber Internal Repository" at "https://jars.kaliber.io/artifactory/libs-release-local"
-
-  // use the following for play 2.3 and below
-  resolvers += "Rhinofly Internal Repository" at "http://maven-repository.rhinofly.net:8081/artifactory/libs-release-local"
 ```
 
 Configuration
