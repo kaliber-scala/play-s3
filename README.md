@@ -70,10 +70,18 @@ s3.pathStyleAccess=false
 Usage
 -----
 
+Getting a S3 instance:
+
+``` scala
+val s3 = S3.fromApplication(playApplication)
+// or
+val s3 = S3.fromConfiguration(wsClient, playConfiguration)
+```
+
 Getting a bucket:
 
 ``` scala
-val bucket = S3("bucketName")
+val bucket = s3.getBucket("bucketName")
 ```
 
 Adding a file:
