@@ -25,7 +25,7 @@ object AwsCredentials extends ((String, String, Option[String]) => AwsCredential
   def fromConfiguration(configuration: Configuration): AwsCredentials = fromConfiguration("aws", configuration)
   def fromConfiguration(prefix: String, configuration: Configuration): AwsCredentials = {
     def error(key:String) = throw new PlayException("Configuration error", "Could not find " + key + " in settings")
-    def getOpt(key:String) = configuration getString key
+    def getOpt(key:String) = configuration.getOptional[String](key)
     def get(key:String) = getOpt(key) getOrElse error(key)
 
     SimpleAwsCredentials(get(s"${prefix}.accessKeyId"), get(s"${prefix}.secretKey"), getOpt(s"${prefix}.token"))

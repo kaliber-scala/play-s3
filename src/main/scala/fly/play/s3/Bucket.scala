@@ -1,12 +1,9 @@
 package fly.play.s3
 
 import java.util.Date
-
-
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.xml.Elem
 import fly.play.aws.policy.PolicyBuilder
-import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import play.api.libs.ws.WSResponse
 import fly.play.aws.acl.ACLList
 import fly.play.aws.policy.Condition
@@ -62,7 +59,7 @@ case class Bucket(
    *
    * @param itemName	The name of the item you want to retrieve
    */
-  def get(itemName: String): Future[BucketFile] =
+  def get(itemName: String)(implicit executionContext: ExecutionContext): Future[BucketFile] =
     s3.get(name, Some(itemName), None, None, None) map S3Response { (status, response) =>
       val headers = extractHeaders(response)
 
@@ -78,22 +75,22 @@ case class Bucket(
    *
    * @param itemName  The name of the item you want to receive the headers from
    */
-  def getHeadersOf(itemName: String): Future[Map[String, Seq[String]]] =
+  def getHeadersOf(itemName: String)(implicit executionContext: ExecutionContext): Future[Map[String, Seq[String]]] =
     s3.head(name, itemName) map (_.allHeaders)
 
   /**
    * Lists the contents of the bucket
    */
-  def list: Future[Iterable[BucketItem]] =
+  def list(implicit executionContext: ExecutionContext): Future[Iterable[BucketItem]] =
     list(None)
 
   /**
    * Lists the contents of a 'directory' in the bucket
    */
-  def list(prefix: String): Future[Iterable[BucketItem]] =
+  def list(prefix: String)(implicit executionContext: ExecutionContext): Future[Iterable[BucketItem]] =
     list(Some(prefix))
 
-  private def list(prefix: Option[String]): Future[Iterable[BucketItem]] = {
+  private def list(prefix: Option[String])(implicit executionContext: ExecutionContext): Future[Iterable[BucketItem]] = {
 
     def listWithMarker(marker: Option[String], accum: Seq[BucketItem]): Future[Iterable[BucketItem]] =
       s3.get(name, None, prefix, delimiter, marker) map
@@ -108,25 +105,28 @@ case class Bucket(
   /**
    * @see add
    */
-  def + = add _
+  def + : BucketFile => ExecutionContext => Unit =
+    file => implicit executionContext => add(file)
+
   /**
    * Adds a file to this bucket
    *
    * @param bucketFile	A representation of the file
    */
-  def add(bucketFile: BucketFile): Future[Unit] =
+  def add(bucketFile: BucketFile)(implicit executionContext: ExecutionContext): Future[Unit] =
     s3.put(name, bucketFile) map unitResponse
 
   /**
    * @see remove
    */
-  def - = remove _
+  def - : String => ExecutionContext => Unit =
+    itemName => implicit executionContext => remove(itemName)
   /**
    * Removes a file from this bucket
    *
    * @param itemName	The name of the file that needs to be removed
    */
-  def remove(itemName: String): Future[Unit] =
+  def remove(itemName: String)(implicit executionContext: ExecutionContext): Future[Unit] =
     s3.delete(name, itemName) map unitResponse
 
   /**
@@ -149,7 +149,12 @@ case class Bucket(
    * @param destinationItemName		The new name of the item
    * @param acl						The ACL for the new item, default is PUBLIC_READ
    */
-  def rename(sourceItemName: String, destinationItemName: String, acl: ACL = PUBLIC_READ, headers: Map[String, String] = Map.empty): Future[Unit] = {
+  def rename(
+    sourceItemName: String,
+    destinationItemName: String,
+    acl: ACL = PUBLIC_READ,
+    headers: Map[String, String] = Map.empty
+  )(implicit executionContext: ExecutionContext): Future[Unit] = {
     val copyResult = s3.putCopy(name, sourceItemName, name, destinationItemName, acl, headers) map unitResponse
     copyResult.flatMap { response =>
       remove(sourceItemName)
@@ -166,7 +171,12 @@ case class Bucket(
    * @param destinationItemName		The destination name of the item
    * @param acl						The ACL for the new item, default is PUBLIC_READ
    */
-  def clone(sourceItemName: String, destinationItemName: String, acl: ACL = PUBLIC_READ, headers: Map[String, String] = Map.empty): Future[Unit] =
+  def clone(
+    sourceItemName: String,
+    destinationItemName: String,
+    acl: ACL = PUBLIC_READ,
+    headers: Map[String, String] = Map.empty
+  )(implicit executionContext: ExecutionContext): Future[Unit] =
     s3.putCopy(name, sourceItemName, name, destinationItemName, acl, headers) map unitResponse
 
   /**
@@ -176,7 +186,7 @@ case class Bucket(
    *
    * @return The upload id
    */
-  def initiateMultipartUpload(bucketFile: BucketFile): Future[BucketFileUploadTicket] = {
+  def initiateMultipartUpload(bucketFile: BucketFile)(implicit executionContext: ExecutionContext): Future[BucketFileUploadTicket] = {
     val multipartUpload = s3.initiateMultipartUpload(name, bucketFile)
     multipartUpload map S3Response { (status, response) =>
       val uploadId = (response.xml \ "UploadId").text
@@ -190,7 +200,7 @@ case class Bucket(
    * @param uploadTicket	The ticket acquired from initiateMultipartUpload
    *
    */
-  def abortMultipartUpload(uploadTicket: BucketFileUploadTicket): Future[Unit] =
+  def abortMultipartUpload(uploadTicket: BucketFileUploadTicket)(implicit executionContext: ExecutionContext): Future[Unit] =
     s3.abortMultipartUpload(name, uploadTicket) map unitResponse
 
   /**
@@ -199,7 +209,10 @@ case class Bucket(
    * @param uploadTicket    The ticket acquired from initiateMultipartUpload
    * @param bucketFilePart  The part that you want to upload
    */
-  def uploadPart(uploadTicket: BucketFileUploadTicket, bucketFilePart: BucketFilePart): Future[BucketFilePartUploadTicket] = {
+  def uploadPart(
+    uploadTicket: BucketFileUploadTicket,
+    bucketFilePart: BucketFilePart
+  )(implicit executionContext: ExecutionContext): Future[BucketFilePartUploadTicket] = {
     val uploadPart = s3.uploadPart(name, uploadTicket, bucketFilePart)
 
     uploadPart map S3Response { (status, response) =>
@@ -214,7 +227,10 @@ case class Bucket(
    * @param uploadTicket      The ticket acquired from initiateMultipartUpload
    * @param partUploadTickets The tickets acquired from uploadPart
    */
-  def completeMultipartUpload(uploadTicket: BucketFileUploadTicket, partUploadTickets: Seq[BucketFilePartUploadTicket]): Future[Unit] =
+  def completeMultipartUpload(
+    uploadTicket: BucketFileUploadTicket,
+    partUploadTickets: Seq[BucketFilePartUploadTicket]
+  )(implicit executionContext: ExecutionContext): Future[Unit] =
     s3.completeMultipartUpload(name, uploadTicket, partUploadTickets) map unitResponse
 
   /**
@@ -223,7 +239,7 @@ case class Bucket(
    * @param itemName	The name of file that needs to be updated
    * @param acl			The ACL
    */
-  def updateAcl(itemName: String, acl: ACL): Future[Unit] =
+  def updateAcl(itemName: String, acl: ACL)(implicit executionContext: ExecutionContext): Future[Unit] =
     s3.putAcl(name, itemName, acl) map unitResponse
 
   /**
@@ -231,7 +247,7 @@ case class Bucket(
    *
    * @param itemName	The name of the file that you want to retrieve the ACL for
    */
-  def getAcl(itemName: String): Future[ACLList] =
+  def getAcl(itemName: String)(implicit executionContext: ExecutionContext): Future[ACLList] =
     s3.getAcl(name, itemName) map aclListResponse
 
   private def extractHeaders(response: WSResponse) = {

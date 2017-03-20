@@ -29,10 +29,10 @@ object S3Configuration {
 
   def fromConfiguration(configuration: Configuration) = {
 
-    val region = configuration getString "s3.region" getOrElse "us-east-1"
-    val https = configuration getBoolean "s3.https" getOrElse true
-    val host = configuration getString "s3.host" getOrElse regionEndpoints(region)
-    val pathStyleAccess = configuration getBoolean "s3.pathStyleAccess" getOrElse true
+    val region = configuration.getOptional[String]("s3.region") getOrElse "us-east-1"
+    val https = configuration.getOptional[Boolean]("s3.https") getOrElse true
+    val host = configuration.getOptional[String]("s3.host") getOrElse regionEndpoints(region)
+    val pathStyleAccess = configuration.getOptional[Boolean]("s3.pathStyleAccess") getOrElse true
 
     S3Configuration(AwsCredentials fromConfiguration configuration, region, https, host, pathStyleAccess)
   }

@@ -1,8 +1,7 @@
 package fly.play.s3
 
 import akka.util.ByteString
-import scala.concurrent.Future
-import play.api.libs.ws.WS
+import scala.concurrent.{ ExecutionContext, Future }
 import play.api.http.Writeable
 import play.api.libs.ws.WSResponse
 import play.api.Application
@@ -69,11 +68,7 @@ class S3(val client:S3Client) {
    *
    * @see Bucket.add
    */
-  def put(bucketName: String, bucketFile: BucketFile): Future[WSResponse] = {
-    // The comment in the commit was: Don’t use ContentTypeOf in play-ws
-    // It's unclear what the underlying reason is
-    // https://github.com/playframework/playframework/commit/56ec574eda926496cc736905102f9637c6466132#diff-de5b238615b352ff9143bbb102be70a3
-    import play.api.libs.iteratee.Execution.Implicits.trampoline
+  def put(bucketName: String, bucketFile: BucketFile)(implicit executionContext: ExecutionContext): Future[WSResponse] = {
     implicit val writeable:Writeable[Array[Byte]] = Writeable(ByteString.apply, Some(bucketFile.contentType))
 
     val acl = bucketFile.acl getOrElse PUBLIC_READ
@@ -85,14 +80,14 @@ class S3(val client:S3Client) {
       .put(bucketFile.content)
   }
 
-  def putAcl(bucketName: String, sourcePath: String, acl: ACL): Future[WSResponse] =
+  def putAcl(bucketName: String, sourcePath: String, acl: ACL)(implicit executionContext: ExecutionContext): Future[WSResponse] =
     client
       .resourceRequest(bucketName, sourcePath)
       .withQueryString("acl" -> "")
       .withHeaders("X-Amz-acl" -> acl.value)
       .put("")
 
-  def getAcl(bucketName: String, sourcePath: String): Future[WSResponse] =
+  def getAcl(bucketName: String, sourcePath: String)(implicit executionContext: ExecutionContext): Future[WSResponse] =
     client
       .resourceRequest(bucketName, sourcePath)
       .withQueryString("acl" -> "")
@@ -115,7 +110,7 @@ class S3(val client:S3Client) {
    * @see Bucket.list
    */
   def get(bucketName: String, path: Option[String], prefix: Option[String],
-    delimiter: Option[String], marker: Option[String]): Future[WSResponse] =
+    delimiter: Option[String], marker: Option[String])(implicit executionContext: ExecutionContext): Future[WSResponse] =
 
     client
       .resourceRequest(bucketName, path.getOrElse(""))
@@ -133,7 +128,7 @@ class S3(val client:S3Client) {
    *
    * @see Bucket.getHeadersOf
    */
-  def head(bucketName: String, path: String): Future[WSResponse] =
+  def head(bucketName: String, path: String)(implicit executionContext: ExecutionContext): Future[WSResponse] =
 
     client
       .resourceRequest(bucketName, path)
@@ -147,7 +142,7 @@ class S3(val client:S3Client) {
    *
    * @see Bucket.remove
    */
-  def delete(bucketName: String, path: String): Future[WSResponse] =
+  def delete(bucketName: String, path: String)(implicit executionContext: ExecutionContext): Future[WSResponse] =
     client
       .resourceRequest(bucketName, path)
       .delete
@@ -188,7 +183,13 @@ class S3(val client:S3Client) {
    *
    * @see Bucket.rename
    */
-  def putCopy(sourceBucketName: String, sourcePath: String, destinationBucketName: String, destinationPath: String, acl: ACL, headers: Map[String, String] = Map.empty): Future[WSResponse] = {
+  def putCopy(
+    sourceBucketName: String,
+    sourcePath: String,
+    destinationBucketName: String,
+    destinationPath: String,
+    acl: ACL, headers: Map[String, String] = Map.empty
+  )(implicit executionContext: ExecutionContext): Future[WSResponse] = {
     val source = "/" + sourceBucketName + "/" + sourcePath
 
     client
@@ -207,11 +208,9 @@ class S3(val client:S3Client) {
    *
    * @see Bucket.add
    */
-  def initiateMultipartUpload(bucketName: String, bucketFile: BucketFile): Future[WSResponse] = {
+  def initiateMultipartUpload(bucketName: String, bucketFile: BucketFile)(implicit executionContext: ExecutionContext): Future[WSResponse] = {
     require(bucketFile.content.isEmpty, "The given file should not contain content")
 
-    // see comment in put method
-    import play.api.libs.iteratee.Execution.Implicits.trampoline
     implicit val writeable:Writeable[Array[Byte]] = Writeable(ByteString.apply, Some(bucketFile.contentType))
 
     val acl = bucketFile.acl getOrElse PUBLIC_READ
@@ -232,7 +231,7 @@ class S3(val client:S3Client) {
    *
    * @see initiateMultipartUpload
    */
-  def abortMultipartUpload(bucketName: String, uploadTicket: BucketFileUploadTicket): Future[WSResponse] = {
+  def abortMultipartUpload(bucketName: String, uploadTicket: BucketFileUploadTicket)(implicit executionContext: ExecutionContext): Future[WSResponse] = {
 
     client
       .resourceRequest(bucketName, uploadTicket.name)
@@ -250,7 +249,11 @@ class S3(val client:S3Client) {
    *
    * @see initiateMultipartUpload
    */
-  def uploadPart(bucketName: String, uploadTicket: BucketFileUploadTicket, bucketFilePart: BucketFilePart): Future[WSResponse] = {
+  def uploadPart(
+    bucketName: String,
+    uploadTicket: BucketFileUploadTicket,
+    bucketFilePart: BucketFilePart
+  )(implicit executionContext: ExecutionContext): Future[WSResponse] = {
     require(bucketFilePart.partNumber > 0, "The partNumber must be greater than 0")
     require(bucketFilePart.partNumber < 10001, "The partNumber must be lesser than 10001")
 
@@ -272,7 +275,11 @@ class S3(val client:S3Client) {
    * @see initiateMultipartUpload
    * @see uploadPart
    */
-  def completeMultipartUpload(bucketName: String, uploadTicket: BucketFileUploadTicket, partUploadTickets: Seq[BucketFilePartUploadTicket]): Future[WSResponse] = {
+  def completeMultipartUpload(
+    bucketName: String,
+    uploadTicket: BucketFileUploadTicket,
+    partUploadTickets: Seq[BucketFilePartUploadTicket]
+  )(implicit executionContext: ExecutionContext): Future[WSResponse] = {
     val body = <CompleteMultipartUpload>{ partUploadTickets.map(_.toXml) }</CompleteMultipartUpload>
 
     client

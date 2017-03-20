@@ -5,12 +5,10 @@ import fly.play.aws.AwsUrlEncoder
 import fly.play.aws.acl.{ CanonicalUser, FULL_CONTROL, Grant, Group, READ }
 import fly.play.aws.policy.Condition
 import fly.play.s3.upload.{ Form, FormElement }
-import play.api.Play.current
 import play.api.http.HeaderNames.{ CONTENT_TYPE, LOCATION }
 import play.api.libs.json.Json
 import play.api.libs.json.JsArray
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
-import play.api.libs.ws.WS
 import play.api.test.Helpers.running
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ Await, Future }
@@ -20,6 +18,8 @@ import utils.MultipartFormData
 
 class S3BucketSpec extends S3SpecSetup {
   sequential
+
+  implicit val application = fakeApplication()
 
   "S3 should return an instance of bucket" inApp {
     S3(testBucketName) must beAnInstanceOf[Bucket]

@@ -1,16 +1,16 @@
 package fly.play.s3
 
-import akka.stream.ActorMaterializer
 import play.api.libs.ws.WSClient
 import play.api.libs.ws.WSRequest
 import fly.play.aws.AwsRequestHolder
 import fly.play.aws.AwsSigner
+import scala.concurrent.ExecutionContext
 
 class S3Client(private val wsClient: WSClient, val signer: AwsSigner, val configuration: S3Configuration) {
 
-  def resourceRequest(bucketName: String, path: String): WSRequest = {
+  def resourceRequest(bucketName: String, path: String)(implicit executionContext: ExecutionContext): WSRequest = {
     val url = resourceUrl(bucketName, path)
-    new AwsRequestHolder(wsClient.url(url).withFollowRedirects(true), signer)
+    new AwsRequestHolder(wsClient.url(url).withFollowRedirects(true), signer, executionContext)
   }
 
   def resourceUrl(bucketName: String, path: String) = {

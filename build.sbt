@@ -2,16 +2,20 @@ name := "play-s3"
 
 organization := "net.kaliber"
 
-scalaVersion := "2.11.6"
+scalaVersion := "2.12.1"
 
-crossScalaVersions := Seq("2.11.6")
+crossScalaVersions := Seq("2.12.1", "2.11.6")
 
 releaseCrossBuild := true
 
+val playVersion = "2.6.0-M2"
+
 libraryDependencies ++= Seq(
-  "com.typesafe.play" %% "play-ws"     % "2.5.0" % "provided",
-  "com.typesafe.play" %% "play-test"   % "2.5.0" % "test",
-  "org.specs2"        %% "specs2-core" % "3.6.1" % "test"
+  "com.typesafe.play" %% "play-ws"     % playVersion % "provided",
+  "com.typesafe.play" %% "play-test"   % playVersion % "test",
+  "com.typesafe.play" %% "play-specs2" % playVersion % "test",
+  "com.typesafe.play" %% "play-ahc-ws" % playVersion % "test",
+  "org.specs2"        %% "specs2-core" % "3.8.9"     % "test"
 )
 
 publishTo := {
@@ -31,5 +35,3 @@ scalacOptions ++= Seq("-feature", "-deprecation")
 // https://github.com/playframework/playframework/issues/4827
 
 fork in Test := true
-
-javaOptions in Test += "-Dconfig.file=test/conf/application.conf"

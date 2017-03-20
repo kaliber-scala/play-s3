@@ -1,46 +1,40 @@
 package fly.play.aws
 
-import org.specs2.mutable.Before
 import org.specs2.mutable.Specification
-import play.api.Play.current
-import play.api.test.FakeApplication
-import play.api.test.Helpers._
 import play.api.Application
+import play.api.inject.guice.GuiceApplicationBuilder
 
 object AwsCredentialsSpec extends Specification {
 
-  def app[T](t: => T): T = running(
-    FakeApplication(
-      additionalConfiguration = Map(
-        "aws.accessKeyId" -> "testKey",
-        "aws.secretKey" -> "testSecret",
-        "alt.accessKeyId" -> "altKey",
-        "alt.secretKey" -> "altSecret"
-      )
-    )
-  ) { t }
+  implicit val application = new GuiceApplicationBuilder()
+    .configure(
+      "aws.accessKeyId" -> "testKey",
+      "aws.secretKey" -> "testSecret",
+      "alt.accessKeyId" -> "altKey",
+      "alt.secretKey" -> "altSecret"
+    ).build()
 
   "AwsCredentials" should {
 
-    "retrieve from application" in app {
+    "retrieve from application" in {
       AwsCredentials.fromApplication must_== AwsCredentials("testKey", "testSecret")
     }
 
-    "load prefixed from application" in app {
+    "load prefixed from application" in {
       AwsCredentials.fromApplication("alt") must_== AwsCredentials("altKey","altSecret")
     }
 
-    "retrieve from configuration" in app {
+    "retrieve from configuration" in {
       val config = implicitly[Application].configuration
       AwsCredentials.fromConfiguration(config) must_== AwsCredentials("testKey", "testSecret")
     }
 
-    "load prefixed from configuration" in app {
+    "load prefixed from configuration" in {
       val config = implicitly[Application].configuration
       AwsCredentials.fromConfiguration("alt", config) must_== AwsCredentials("altKey","altSecret")
     }
 
-    "implement unapply" in app {
+    "implement unapply" in {
       val AwsCredentials(a, b, Some(t)) = AwsCredentials("key", "secret", Some("token"))
       a must_== "key"
       b must_== "secret"
@@ -49,11 +43,11 @@ object AwsCredentialsSpec extends Specification {
 
     def checkImplicit()(implicit c: AwsCredentials) = c
 
-    "provide an implicit value" in app {
+    "provide an implicit value" in {
       checkImplicit must not beNull
     }
 
-    "override the implicit" in app {
+    "override the implicit" in {
       checkImplicit()(AwsCredentials("test", "test")) must_== AwsCredentials("test", "test")
     }
   }
