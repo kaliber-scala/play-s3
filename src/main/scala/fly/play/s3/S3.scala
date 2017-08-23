@@ -1,12 +1,10 @@
 package fly.play.s3
 
 import akka.util.ByteString
-import scala.concurrent.{ ExecutionContext, Future }
-import play.api.http.Writeable
-import play.api.libs.ws.WSResponse
-import play.api.Application
-import play.api.Configuration
-import play.api.libs.ws.WSClient
+import play.api.{Application, Configuration}
+import play.api.libs.ws.{BodyWritable, InMemoryBody, WSClient, WSResponse}
+
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
  * Amazon Simple Storage Service
@@ -69,28 +67,28 @@ class S3(val client:S3Client) {
    * @see Bucket.add
    */
   def put(bucketName: String, bucketFile: BucketFile)(implicit executionContext: ExecutionContext): Future[WSResponse] = {
-    implicit val writeable:Writeable[Array[Byte]] = Writeable(ByteString.apply, Some(bucketFile.contentType))
+    implicit val bodyWritable: BodyWritable[Array[Byte]] = BodyWritable(b => InMemoryBody(ByteString(b)), bucketFile.contentType)
 
     val acl = bucketFile.acl getOrElse PUBLIC_READ
     val headers = (bucketFile.headers getOrElse Map.empty).toList
 
     client
       .resourceRequest(bucketName, bucketFile.name)
-      .withHeaders("X-Amz-acl" -> acl.value :: headers: _*)
+      .addHttpHeaders("X-Amz-acl" -> acl.value :: headers: _*)
       .put(bucketFile.content)
   }
 
   def putAcl(bucketName: String, sourcePath: String, acl: ACL)(implicit executionContext: ExecutionContext): Future[WSResponse] =
     client
       .resourceRequest(bucketName, sourcePath)
-      .withQueryString("acl" -> "")
-      .withHeaders("X-Amz-acl" -> acl.value)
+      .addQueryStringParameters("acl" -> "")
+      .addHttpHeaders("X-Amz-acl" -> acl.value)
       .put("")
 
   def getAcl(bucketName: String, sourcePath: String)(implicit executionContext: ExecutionContext): Future[WSResponse] =
     client
       .resourceRequest(bucketName, sourcePath)
-      .withQueryString("acl" -> "")
+      .addQueryStringParameters("acl" -> "")
       .get
 
   /**
@@ -114,7 +112,7 @@ class S3(val client:S3Client) {
 
     client
       .resourceRequest(bucketName, path.getOrElse(""))
-      .withQueryString(
+      .addQueryStringParameters(
         (prefix.map("prefix" -> _).toList :::
           delimiter.map("delimiter" -> _).toList :::
           marker.map("marker" -> _).toList): _*)
@@ -194,9 +192,9 @@ class S3(val client:S3Client) {
 
     client
       .resourceRequest(destinationBucketName, destinationPath)
-      .withHeaders("X-Amz-acl" -> acl.value)
-      .withHeaders("X-Amz-copy-source" -> source)
-      .withHeaders(headers.toSeq: _*)
+      .addHttpHeaders("X-Amz-acl" -> acl.value)
+      .addHttpHeaders("X-Amz-copy-source" -> source)
+      .addHttpHeaders(headers.toSeq: _*)
       .put("")
   }
 
@@ -211,15 +209,15 @@ class S3(val client:S3Client) {
   def initiateMultipartUpload(bucketName: String, bucketFile: BucketFile)(implicit executionContext: ExecutionContext): Future[WSResponse] = {
     require(bucketFile.content.isEmpty, "The given file should not contain content")
 
-    implicit val writeable:Writeable[Array[Byte]] = Writeable(ByteString.apply, Some(bucketFile.contentType))
+    implicit val bodyWritable: BodyWritable[Array[Byte]] = BodyWritable(b => InMemoryBody(ByteString(b)), bucketFile.contentType)
 
     val acl = bucketFile.acl getOrElse PUBLIC_READ
     val headers = (bucketFile.headers getOrElse Map.empty).toList
 
     client
       .resourceRequest(bucketName, bucketFile.name)
-      .withHeaders("X-Amz-acl" -> acl.value :: headers: _*)
-      .withQueryString("uploads" -> "")
+      .addHttpHeaders("X-Amz-acl" -> acl.value :: headers: _*)
+      .addQueryStringParameters("uploads" -> "")
       .post(Array.empty[Byte])
   }
 
@@ -235,7 +233,7 @@ class S3(val client:S3Client) {
 
     client
       .resourceRequest(bucketName, uploadTicket.name)
-      .withQueryString(
+      .addQueryStringParameters(
         "uploadId" -> uploadTicket.uploadId)
       .delete
   }
@@ -259,7 +257,7 @@ class S3(val client:S3Client) {
 
     client
       .resourceRequest(bucketName, uploadTicket.name)
-      .withQueryString(
+      .addQueryStringParameters(
         "partNumber" -> bucketFilePart.partNumber.toString,
         "uploadId" -> uploadTicket.uploadId)
       .put(bucketFilePart.content)
@@ -284,7 +282,7 @@ class S3(val client:S3Client) {
 
     client
       .resourceRequest(bucketName, uploadTicket.name)
-      .withQueryString(
+      .addQueryStringParameters(
         "uploadId" -> uploadTicket.uploadId)
       .post(body)
   }

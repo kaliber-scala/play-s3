@@ -3,6 +3,8 @@ package utils
 import play.api.http.ContentTypeOf
 import play.api.mvc.Codec
 import play.api.http.Writeable
+import play.api.libs.ws.{BodyWritable, InMemoryBody}
+
 import scala.concurrent.ExecutionContext
 
 case class MultipartFormData(elements: Seq[NameValuePair], boundary: String)(
@@ -22,8 +24,8 @@ case class MultipartFormData(elements: Seq[NameValuePair], boundary: String)(
   object Body {
     implicit val contentTypeOf: ContentTypeOf[Body] =
       ContentTypeOf(Some(contentType))
-    implicit val writes: Writeable[Body] =
-      Writeable(body => codec.encode(body.content))
+    implicit val writes: BodyWritable[Body] =
+      BodyWritable(body => InMemoryBody(codec.encode(body.content)), contentType)
   }
 
   private def toPart(nameValuePair: NameValuePair) = {

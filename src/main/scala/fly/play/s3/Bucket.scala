@@ -76,7 +76,7 @@ case class Bucket(
    * @param itemName  The name of the item you want to receive the headers from
    */
   def getHeadersOf(itemName: String)(implicit executionContext: ExecutionContext): Future[Map[String, Seq[String]]] =
-    s3.head(name, itemName) map (_.allHeaders)
+    s3.head(name, itemName) map (_.headers)
 
   /**
    * Lists the contents of the bucket
@@ -105,8 +105,7 @@ case class Bucket(
   /**
    * @see add
    */
-  def + : BucketFile => ExecutionContext => Unit =
-    file => implicit executionContext => add(file)
+  def +(bucketFile: BucketFile)(implicit executionContext: ExecutionContext) = add(bucketFile)
 
   /**
    * Adds a file to this bucket
@@ -119,8 +118,7 @@ case class Bucket(
   /**
    * @see remove
    */
-  def - : String => ExecutionContext => Unit =
-    itemName => implicit executionContext => remove(itemName)
+  def -(itemName: String)(implicit executionContext: ExecutionContext) = remove(itemName)
   /**
    * Removes a file from this bucket
    *
@@ -252,7 +250,7 @@ case class Bucket(
 
   private def extractHeaders(response: WSResponse) = {
     for {
-      (key, value) <- response.allHeaders
+      (key, value) <- response.headers
       if value.nonEmpty
     } yield key -> value.head
   }

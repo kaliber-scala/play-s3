@@ -12,6 +12,8 @@ class S3ConfigSpec extends S3SpecSetup {
 
   val baseConfig = Map("aws.accessKeyId" -> "", "aws.secretKey" -> "")
 
+  implicit val application = fakeApplication()
+
   "S3" should {
 
     "have the correct default value for host" in {
@@ -60,8 +62,7 @@ class S3ConfigSpec extends S3SpecSetup {
         .url("test.bucket", "test") === "https://s3-eu-west-1.amazonaws.com/test.bucket/test"
     }
 
-    "create the correct url" inApp {
-      import play.api.Play.current
+    "create the correct url" in {
       implicit val credentials = SimpleAwsCredentials("test", "test")
       val url = S3.url(testBucketName, "privateREADME.txt", 1234)
       val host = S3Configuration.fromApplication.host
