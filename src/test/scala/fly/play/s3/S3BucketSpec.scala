@@ -1,20 +1,21 @@
 package fly.play.s3
 
 import java.util.Date
+
 import fly.play.aws.AwsUrlEncoder
-import fly.play.aws.acl.{ CanonicalUser, FULL_CONTROL, Grant, Group, READ }
+import fly.play.aws.acl._
 import fly.play.aws.policy.Condition
-import fly.play.s3.upload.{ Form, FormElement }
-import play.api.http.HeaderNames.{ CONTENT_TYPE, LOCATION }
-import play.api.libs.json.Json
-import play.api.libs.json.JsArray
+import fly.play.s3.upload.{Form, FormElement}
+import play.api.http.HeaderNames.{CONTENT_TYPE, LOCATION}
+import play.api.libs.json.{JsArray, Json}
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
-import play.api.test.Helpers.running
-import scala.concurrent.duration.Duration
-import scala.concurrent.{ Await, Future }
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{ Failure, Success }
+import play.api.test.WsTestClient
 import utils.MultipartFormData
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
+import scala.util.{Failure, Success}
 
 class S3BucketSpec extends S3SpecSetup {
   sequential
@@ -48,7 +49,7 @@ class S3BucketSpec extends S3SpecSetup {
     "give an error if we request an element that does not exist" inApp {
 
       val result = testBucket.get("nonExistingElement")
-      val value = Await.ready(result, Duration.Inf).value.get
+      val value = Await.ready(result, 120.seconds).value.get
 
       value must beLike {
         case Failure(S3Exception(404, "NoSuchKey", _, _)) => ok
@@ -128,7 +129,7 @@ class S3BucketSpec extends S3SpecSetup {
 
       val result = testBucket.list("testPrefix/")
       val value = await(result)
-      value.toSeq(0) match {
+      value.toSeq.head match {
         case BucketItem("testPrefix/README.txt", false) => success
         case f => failure("Wrong file returned: " + f)
       }
@@ -165,10 +166,12 @@ class S3BucketSpec extends S3SpecSetup {
 
     "be able to retrieve the private file using the generated url" inApp {
 
-      val result = WS.url(url).get
+      WsTestClient.withClient { client =>
+        val result = client.url(url).get
 
-      val value = await(result)
-      value.status must_== 200
+        val value = await(result)
+        value.status must_== 200
+      }
     }
 
     "be able to rename a file" inApp {
@@ -334,49 +337,48 @@ class S3BucketSpec extends S3SpecSetup {
       (policy \ "conditions").as[JsArray] === expectedConditions
     }
 
-    "be able to supply an uploadPolicy that can be used to alow browser upload" in {
-      running(fakeApplication(Map("play.ws.followRedirects" -> false))) {
+    "be able to supply an uploadPolicy that can be used to allow browser upload" in {
+      val `1 minute from now` = System.currentTimeMillis + (1 * 60 * 1000)
 
-        val `1 minute from now` = System.currentTimeMillis + (1 * 60 * 1000)
+      import fly.play.aws.policy.Condition._
+      val key = Condition.key
+      val expectedFileName = "test/file.html"
+      val expectedRedirectUrl = "http://fakehost:9000"
+      val expectedTags = "one,two"
+      val expectedContentType = "text/html"
 
-        import fly.play.aws.policy.Condition._
-        val key = Condition.key
-        val expectedFileName = "test/file.html"
-        val expectedRedirectUrl = "http://fakehost:9000"
-        val expectedTags = "one,two"
-        val expectedContentType = "text/html"
+      val policy =
+        testBucket.uploadPolicy(new Date(`1 minute from now`))
+          .withConditions(
+            key startsWith "test/",
+            acl eq PUBLIC_READ,
+            successActionRedirect eq expectedRedirectUrl,
+            header(CONTENT_TYPE) startsWith "text/",
+            meta("tag").any)
+          .toPolicy
 
-        val policy =
-          testBucket.uploadPolicy(new Date(`1 minute from now`))
-            .withConditions(
-              key startsWith "test/",
-              acl eq PUBLIC_READ,
-              successActionRedirect eq expectedRedirectUrl,
-              header(CONTENT_TYPE) startsWith "text/",
-              meta("tag").any)
-            .toPolicy
+      // provide user input
+      val formFieldsFromPolicy =
+        Form(policy).fields
+          .map {
+            case FormElement("key", _, true) =>
+              "key" -> expectedFileName
+            case FormElement("x-amz-meta-tag", _, true) =>
+              "x-amz-meta-tag" -> expectedTags
+            case FormElement(CONTENT_TYPE, _, true) =>
+              CONTENT_TYPE -> expectedContentType
+            case FormElement(name, value, false) =>
+              name -> value
+          }
 
-        // provide user input
-        val formFieldsFromPolicy =
-          Form(policy).fields
-            .map {
-              case FormElement("key", _, true) =>
-                "key" -> expectedFileName
-              case FormElement("x-amz-meta-tag", _, true) =>
-                "x-amz-meta-tag" -> expectedTags
-              case FormElement(CONTENT_TYPE, _, true) =>
-                CONTENT_TYPE -> expectedContentType
-              case FormElement(name, value, false) =>
-                name -> value
-            }
+      val expectedContent = "test text"
+      // file should be the last field
+      val formFields = formFieldsFromPolicy :+ ("file" -> expectedContent)
 
-        val expectedContent = "test text"
-        // file should be the last field
-        val formFields = formFieldsFromPolicy :+ ("file" -> expectedContent)
+      val data = MultipartFormData(formFields, "asdfghjkl123")
 
-        val data = MultipartFormData(formFields, "asdfghjkl123")
-
-        val response = await(WS.url(testBucket.url("")).post(data.body))
+      WsTestClient.withClient { client =>
+        val response = await(client.url(testBucket.url("")).withFollowRedirects(false).post(data.body))
 
         response.status === 303
         response.header(LOCATION).get must startWith(expectedRedirectUrl)

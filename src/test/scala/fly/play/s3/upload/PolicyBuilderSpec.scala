@@ -1,33 +1,16 @@
 package fly.play.s3.upload
 
 import java.util.Calendar
-import org.specs2.mutable.Specification
+
 import fly.play.aws.AwsDates.iso8601DateFormat
-import fly.play.s3.PUBLIC_READ
-import fly.play.s3.S3Signer
-import fly.play.aws.policy.Condition.acl
-import fly.play.aws.policy.Condition.contentLengthRange
-import fly.play.aws.policy.Condition.fromTuple
-import fly.play.aws.policy.Condition.header
-import fly.play.aws.policy.Condition.key
-import fly.play.aws.policy.Condition.meta
-import fly.play.aws.policy.Condition.string
-import fly.play.aws.policy.Condition.successActionRedirect
-import fly.play.aws.policy.Condition.xAmzSecurityToken
-import play.api.http.HeaderNames.CACHE_CONTROL
-import play.api.http.HeaderNames.CONTENT_DISPOSITION
-import play.api.http.HeaderNames.CONTENT_TYPE
+import fly.play.aws.SimpleAwsCredentials
+import fly.play.aws.policy.Condition.{acl, contentLengthRange, fromTuple, header, key, meta, string, successActionRedirect, xAmzSecurityToken}
+import fly.play.aws.policy.{Eq, PolicyBuilder, StartsWith}
+import fly.play.s3.{PUBLIC_READ, S3Signer}
+import org.specs2.mutable.Specification
+import play.api.http.HeaderNames.{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_TYPE}
 import play.api.libs.json.Json
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
-import fly.play.aws.Aws4Signer
-import fly.play.aws.AwsSigner
-import play.api.libs.ws.WS
-import play.api.http.Writeable
-import fly.play.aws.AwsCredentials
-import fly.play.aws.SimpleAwsCredentials
-import fly.play.aws.policy.StartsWith
-import fly.play.aws.policy.PolicyBuilder
-import fly.play.aws.policy.Eq
 
 object PolicyBuilderSpec extends Specification {
   "PolicyBuilder" should {

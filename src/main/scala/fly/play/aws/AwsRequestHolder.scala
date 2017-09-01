@@ -1,19 +1,19 @@
 package fly.play.aws
 
+import java.io.File
+
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import java.io.File
-import java.nio.file.Files
-import play.api.libs.ws.{ WSRequest, _ }
+import play.api.libs.ws.{WSRequest, _}
 import play.api.mvc.MultipartFormData
-import scala.concurrent.{ ExecutionContext, Future }
+
 import scala.concurrent.duration.Duration
+import scala.concurrent.{ExecutionContext, Future}
 
 case class AwsRequestHolder(wrappedRequest: WSRequest, signer: AwsSigner, implicit val executionContext: ExecutionContext) extends WSRequest {
-  type Self = AwsRequestHolder
-  type Response = WSResponse
+  override type Response = WSResponse
 
-  def stream(): Future[StreamedResponse] =
+  def stream(): Future[Response] =
     sign(method).flatMap(_.stream())
 
   def execute(): Future[Response] =
@@ -23,56 +23,54 @@ case class AwsRequestHolder(wrappedRequest: WSRequest, signer: AwsSigner, implic
     sign(method).flatMap(_.execute())
 
   def head(): Future[Response] =
-    sign(method).flatMap(_.head())
+    withMethod("HEAD").execute()
 
   def get(): Future[Response] =
-    sign(method).flatMap(_.get())
+    withMethod("GET").execute()
 
   def post(body: Source[MultipartFormData.Part[Source[ByteString, _]], _]): Future[Response] =
-    sign(method).flatMap(_.post(body))
+    withMethod("POST").withBody(body).execute()
 
   def post[T](body: T)(implicit evidence$3: BodyWritable[T]): Future[Response] =
-    sign(method).flatMap(_.post(body))
+    withMethod("POST").withBody(body).execute()
 
   def post(body: File): Future[Response] =
-    sign(method).flatMap(_.post(body))
+    withMethod("POST").withBody(body).execute()
 
   def put[T](body: T)(implicit evidence: BodyWritable[T]): Future[Response] =
-    sign(method).flatMap(_.put(body))
+    withMethod("PUT").withBody(body).execute()
 
   def put(body: File): Future[Response] =
-    sign(method).flatMap(_.put(body))
+    withMethod("PUT").withBody(body).execute()
 
   def put(body: Source[MultipartFormData.Part[Source[ByteString, _]], _]): Future[Response] =
-    sign(method).flatMap(_.put(body))
+    withMethod("PUT").withBody(body).execute()
 
   def patch(body: Source[MultipartFormData.Part[Source[ByteString, _]], _]): Future[Response] =
-    sign(method).flatMap(_.patch(body))
+    withMethod("PATCH").withBody(body).execute()
 
   def patch[T](body: T)(implicit evidence$2: BodyWritable[T]): Future[Response] =
-    sign(method).flatMap(_.patch(body))
+    withMethod("PATCH").withBody(body).execute()
 
   def patch(body: File): Future[Response] =
-    sign(method).flatMap(_.patch(body))
+    withMethod("PATCH").withBody(body).execute()
 
   def delete(): Future[Response] =
-    sign(method).flatMap(_.delete())
+    withMethod("DELETE").execute()
 
   def options(): Future[Response] =
-    sign(method).flatMap(_.options())
+    withMethod("OPTIONS").execute()
 
   private def sign(method: String) = {
     for {
       body <- getBodyFromRequest
-      signedRequest = signer.sign(wrappedRequest, method, body)
-    } yield copy(wrappedRequest = signedRequest)
+    } yield signer.sign(wrappedRequest, method, body)
   }
 
   private def getBodyFromRequest: Future[Array[Byte]] =
     wrappedRequest.body match {
       case InMemoryBody(bytes)  => Future successful bytes.toArray
-      case StreamedBody(source) => streamingBodyNotSupported
-      case FileBody(file)       => Future successful Files.readAllBytes(file.toPath)
+      case SourceBody(source)   => streamingBodyNotSupported
       case EmptyBody            => Future successful Array.empty[Byte]
     }
 
@@ -81,6 +79,7 @@ case class AwsRequestHolder(wrappedRequest: WSRequest, signer: AwsSigner, implic
   val auth = wrappedRequest.auth
   val body = wrappedRequest.body
   val calc = wrappedRequest.calc
+  val cookies = wrappedRequest.cookies
   val followRedirects = wrappedRequest.followRedirects
   val headers = wrappedRequest.headers
   val method = wrappedRequest.method
@@ -90,49 +89,60 @@ case class AwsRequestHolder(wrappedRequest: WSRequest, signer: AwsSigner, implic
   val url = wrappedRequest.url
   val virtualHost = wrappedRequest.virtualHost
 
-  def sign(calc: WSSignatureCalculator): Self =
+  def sign(calc: WSSignatureCalculator): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest sign calc)
 
-  def withAuth(username: String, password: String, scheme: WSAuthScheme): Self =
+  def withAuth(username: String, password: String, scheme: WSAuthScheme): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest.withAuth(username, password, scheme))
 
-  def withBody(body: WSBody): Self =
+  def withBody(body: WSBody): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withBody body)
 
-  def withBody(body: Source[MultipartFormData.Part[Source[ByteString, _]], _]): Self =
+  def withBody(body: Source[MultipartFormData.Part[Source[ByteString, _]], _]): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withBody body)
 
-  def withBody(file: File): Self =
+  def withBody(file: File): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withBody body)
 
-  def withBody[T](body: T)(implicit evidence$1: BodyWritable[T]): Self =
+  def withBody[T](body: T)(implicit evidence$1: BodyWritable[T]): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withBody body)
 
-  def withFollowRedirects(follow: Boolean): Self =
+  def withCookies(cookie: WSCookie*): AwsRequestHolder =
+    copy(wrappedRequest = wrappedRequest withCookies (cookie: _*))
+
+  def withFollowRedirects(follow: Boolean): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withFollowRedirects follow)
 
-  def withHeaders(hdrs: (String, String)*): Self =
+  @deprecated("Deprecated in Play 2.6.0, use addHttpHeaders or addHttpHeaders", "9.0.0")
+  def withHeaders(hdrs: (String, String)*): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withHeaders (hdrs: _*))
 
-  def withMethod(method: String): Self =
+  def withHttpHeaders(hdrs: (String, String)*): AwsRequestHolder =
+    copy(wrappedRequest = wrappedRequest withHttpHeaders (hdrs: _*))
+
+  def withMethod(method: String): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withMethod method)
 
-  def withProxyServer(proxyServer: WSProxyServer): Self =
+  def withProxyServer(proxyServer: WSProxyServer): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withProxyServer proxyServer)
 
-  def withQueryString(parameters: (String, String)*): Self =
+  @deprecated("Deprecated in Play 2.6.0, use addQueryStringParameters or addQueryStringParameters", "9.0.0")
+  def withQueryString(parameters: (String, String)*): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withQueryString (parameters: _*))
 
-  def withRequestTimeout(timeout: Long): Self =
+  def withQueryStringParameters(parameters: (String, String)*): AwsRequestHolder =
+    copy(wrappedRequest = wrappedRequest withQueryStringParameters (parameters: _*))
+
+  def withRequestTimeout(timeout: Long): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withRequestTimeout Duration(timeout, "second"))
 
-  def withVirtualHost(vh: String): Self =
+  def withVirtualHost(vh: String): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withVirtualHost vh)
 
-  def withRequestFilter(filter: WSRequestFilter): Self =
+  def withRequestFilter(filter: WSRequestFilter): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withRequestFilter filter)
 
-  def withRequestTimeout(timeout: Duration): Self =
+  def withRequestTimeout(timeout: Duration): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withRequestTimeout timeout)
 
   private def streamingBodyNotSupported =

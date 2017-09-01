@@ -104,7 +104,7 @@ class Aws4Signer(
     val simplifiedHeaders = extraHeaders.toSeq.flatMap {
       case (name, values) => values.map(name -> _)
     }
-    wsRequest.withHeaders(simplifiedHeaders: _*)
+    wsRequest.addHttpHeaders(simplifiedHeaders: _*)
   }
 
   private def createAuthorizationHeaders(request: AwsRequest): Map[String, Seq[String]] = {

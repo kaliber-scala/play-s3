@@ -9,6 +9,6 @@ class S3Signer(credentials: AwsCredentials, region: String)
 
   // always include the content payload header
   override def sign(request: WSRequest, method: String, body: Array[Byte]): WSRequest =
-    super.sign(request.withHeaders(amzContentSha256(body)), method, body)
+    super.sign(request.addHttpHeaders(amzContentSha256(body)), method, body)
 
 }

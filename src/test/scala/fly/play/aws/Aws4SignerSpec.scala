@@ -1,29 +1,19 @@
 package fly.play.aws
 
-import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
+import java.net.URLEncoder
+import java.util.{Calendar, Date, TimeZone}
+
 import akka.util.ByteString
 import fly.play.s3.S3SpecSetup
-import java.net.URLEncoder
-import java.util.Calendar
-import java.util.Date
-import java.util.TimeZone
-import org.specs2.mutable.Specification
-import play.api.http.Writeable
-import play.api.libs.ws.{ WSClient, WSRequest }
-import play.api.libs.ws
-import play.api.libs.ws.ahc.{ AhcWSClient, AsyncHttpClientProvider }
-import play.shaded.ahc.org.asynchttpclient.DefaultAsyncHttpClientConfig
-import play.api.test
+import play.api.libs.ws.{BodyWritable, InMemoryBody, WSRequest}
 import play.api.test.WsTestClient
+
 import scala.collection.mutable
 import scala.language.reflectiveCalls
 
 object Aws4SignerSpec extends S3SpecSetup {
 
   "Aws4Signer" should {
-
-    val application =
 
     "example1" >> {
       val expectedCannonicalRequest =
@@ -52,7 +42,7 @@ object Aws4SignerSpec extends S3SpecSetup {
         val request =
           client
             .url("https://sts.amazonaws.com")
-            .withQueryString(
+            .addQueryStringParameters(
               "Action" -> "GetSessionToken",
               "DurationSeconds" -> "3600",
               "Version" -> "2011-06-15")
@@ -98,7 +88,7 @@ object Aws4SignerSpec extends S3SpecSetup {
         val request =
           client
             .url("https://sts.amazonaws.com")
-            .withQueryString(
+            .addQueryStringParameters(
               "Action" -> "GetSessionToken",
               "DurationSeconds" -> "3600",
               "Version" -> "2011-06-15")
@@ -144,7 +134,7 @@ object Aws4SignerSpec extends S3SpecSetup {
         val request =
           client
             .url("http://examplebucket.s3.amazonaws.com/test.txt")
-            .withHeaders(
+            .addHttpHeaders(
               signer.amzContentSha256(Array.empty),
               "Range" -> "bytes=0-9")
 
@@ -167,35 +157,36 @@ object Aws4SignerSpec extends S3SpecSetup {
         """|PUT
            |/test%24file.text
            |
+           |content-type:text/plain
            |date:Fri, 24 May 2013 00:00:00 GMT
            |host:examplebucket.s3.amazonaws.com
            |x-amz-content-sha256:44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072
            |x-amz-date:20130524T000000Z
            |x-amz-storage-class:REDUCED_REDUNDANCY
            |
-           |date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class
+           |content-type;date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class
            |44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072""".stripMargin
 
       val expectedStringToSign =
         """|AWS4-HMAC-SHA256
            |20130524T000000Z
            |20130524/us-east-1/s3/aws4_request
-           |9e0e90d9c76de8fa5b200d8c849cd5b8dc7a3be3951ddb7f6a76b4158342019d""".stripMargin
+           |0f10f84734b64a0f7ac71f28a26c6d34d07bc39df988e9e9c39bfc1fc154b6cd""".stripMargin
 
-      val expectedSignature = "98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd"
+      val expectedSignature = "f093977030bf8d8069918f1b3546fd02cf697d43e763c40d58c109a2e197bdac"
 
-      val expectedAuthorizationHeader = "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd"
+      val expectedAuthorizationHeader = "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=content-type;date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=f093977030bf8d8069918f1b3546fd02cf697d43e763c40d58c109a2e197bdac"
 
       val signer = newSigner()
       val body = "Welcome to Amazon S3."
 
-      implicit def writeable: Writeable[String] = Writeable(s => ByteString(s.getBytes), None)
+      implicit def bodyWritable: BodyWritable[String] = BodyWritable(s => InMemoryBody(ByteString(s)), "text/plain")
 
       WsTestClient.withClient { client =>
         val request =
           client
             .url("http://examplebucket.s3.amazonaws.com/" + URLEncoder.encode("test$file.text", "UTF-8"))
-            .withHeaders(
+            .addHttpHeaders(
               "x-amz-storage-class" -> "REDUCED_REDUNDANCY",
               "Date" -> "Fri, 24 May 2013 00:00:00 GMT",
               signer.amzContentSha256(body.getBytes))
@@ -245,8 +236,8 @@ object Aws4SignerSpec extends S3SpecSetup {
         val request =
           client
             .url("http://examplebucket.s3.amazonaws.com")
-            .withQueryString("lifecycle" -> "")
-            .withHeaders(signer.amzContentSha256(Array.empty))
+            .addQueryStringParameters("lifecycle" -> "")
+            .addHttpHeaders(signer.amzContentSha256(Array.empty))
 
         val signedRequest = signer.sign(request, "GET", Array.empty)
 
@@ -292,7 +283,7 @@ object Aws4SignerSpec extends S3SpecSetup {
         val request =
           client
             .url("http://examplebucket.s3.amazonaws.com")
-            .withQueryString(
+            .addQueryStringParameters(
               "prefix" -> "J",
               "max-keys" -> "2")
 
@@ -405,6 +396,6 @@ object Aws4SignerSpec extends S3SpecSetup {
 
   class AmzContentHeaderSignerSpy extends SignerSpy {
     override def sign(request: WSRequest, method: String, body: Array[Byte]): WSRequest =
-      super.sign(request.withHeaders(amzContentSha256(Array.empty)), method, body)
+      super.sign(request.addHttpHeaders(amzContentSha256(Array.empty)), method, body)
   }
 }
