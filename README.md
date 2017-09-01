@@ -1,4 +1,4 @@
-Amazon Simple Storage Service (S3) module for Play 2.5
+Amazon Simple Storage Service (S3) module for Play 2.6
 =====================================================
 
 A minimal S3 API wrapper. Allows you to list, get, add and remove items from a bucket.
