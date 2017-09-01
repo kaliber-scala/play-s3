@@ -9,6 +9,10 @@ Has some extra features that help with direct upload and authenticated url gener
 
 Important changes
 -----------------
+**9.0.0**
+ - Upgraded to Play 2.6
+ - Upgraded to Scala 2.12
+
 **8.0.0**
  - Upgraded to Play 2.5
 
@@ -23,8 +27,10 @@ Installation
 
 ``` scala
   val appDependencies = Seq(
-    "net.kaliber" %% "play-s3" % "8.0.0"
+    "net.kaliber" %% "play-s3" % "9.0.0"
 
+    // use the following version for play 2.5
+    "net.kaliber" %% "play-s3" % "8.0.1"
     // use the following version for play 2.4
     "net.kaliber" %% "play-s3" % "7.0.2"
     // use the following version for play 2.3
