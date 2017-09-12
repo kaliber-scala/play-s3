@@ -30,7 +30,7 @@ Installation
     "net.kaliber" %% "play-s3" % "9.0.0"
 
     // use the following version for play 2.5
-    "net.kaliber" %% "play-s3" % "8.0.1"
+    "net.kaliber" %% "play-s3" % "8.0.0"
     // use the following version for play 2.4
     "net.kaliber" %% "play-s3" % "7.0.2"
     // use the following version for play 2.3
