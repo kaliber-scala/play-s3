@@ -41,7 +41,7 @@ Installation
     //"nl.rhinofly" %% "play-s3" % "3.1.1"
   )
 
-    // use the following for play 2.4
+    // use the following for play 2.5 and 2.4
   resolvers += "Kaliber Internal Repository" at "https://jars.kaliber.io/artifactory/libs-release-local"
 
   // use the following for play 2.3 and below

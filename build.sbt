@@ -1,39 +1,65 @@
-name := "play-s3"
-
-organization := "net.kaliber"
-
-scalaVersion := "2.12.2"
-
-crossScalaVersions := Seq("2.12.2", "2.11.6")
-
-releaseCrossBuild := true
-
 val playVersion = "2.6.3"
 
-libraryDependencies ++= Seq(
-  "com.typesafe.play" %% "play-ws"     % playVersion % "provided",
-  "com.typesafe.play" %% "play-test"   % playVersion % "test",
-  "com.typesafe.play" %% "play-specs2" % playVersion % "test",
-  "com.typesafe.play" %% "play-ahc-ws" % playVersion % "test",
-  "com.typesafe.play" %% "play-logback" % playVersion % "test"
-)
+lazy val root = (project in file("."))
+  .settings(
+    name := "play-s3",
+    organization := "net.kaliber",
+    scalaVersion := "2.12.2",
+    libraryDependencies ++= Seq(
+      "com.typesafe.play" %% "play-ws"     % playVersion % "provided",
+      "com.typesafe.play" %% "play-test"   % playVersion % "test",
+      "com.typesafe.play" %% "play-specs2" % playVersion % "test",
+      "com.typesafe.play" %% "play-ahc-ws" % playVersion % "test",
+      "com.typesafe.play" %% "play-logback" % playVersion % "test"
+    )
+  )
+  .settings(bintraySettings: _*)
 
-publishTo := {
-  val repo = if (version.value endsWith "SNAPSHOT") "snapshot" else "release"
-  Some("Kaliber Internal " + repo.capitalize + " Repository" at "https://jars.kaliber.io/artifactory/libs-" + repo + "-local")
-}
+lazy val bintraySettings = Seq(
+  licenses += ("MIT", url("http://opensource.org/licenses/MIT")),
+  homepage := Some(url("https://github.com/kaliber-scala/play-s3")),
+  bintrayOrganization := Some("kaliber-scala"),
+  bintrayReleaseOnPublish := false,
+  publishMavenStyle := true,
+  crossScalaVersions := Seq("2.12.2", "2.11.6"),
+  releaseCrossBuild := true,
 
-credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
-
-resolvers ++= Seq(
-  "Typesafe Release Repository" at "http://repo.typesafe.com/typesafe/releases",
-  "scalaz-bintray" at "https://dl.bintray.com/scalaz/releases"
+  pomExtra := (
+    <scm>
+      <connection>scm:git@github.com:kaliber-scala/play-s3.git</connection>
+      <developerConnection>scm:git@github.com:kaliber-scala/play-s3.git</developerConnection>
+      <url>https://github.com/kaliber-scala/play-s3</url>
+    </scm>
+    <developers>
+      <developer>
+        <id>Kaliber</id>
+        <name>Kaliber Interactive</name>
+        <url>https://kaliber.net/</url>
+      </developer>
+    </developers>
+    )
 )
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
-// https://github.com/playframework/playframework/issues/4827
-
 fork in Test := true
 
 javaOptions in Test += "-Dconfig.file=test/conf/application.conf"
+
+// Release
+import ReleaseTransformations._
+releasePublishArtifactsAction := PgpKeys.publishSigned.value
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  runClean,
+  runTest,
+  setReleaseVersion,
+  commitReleaseVersion,
+  tagRelease,
+  publishArtifacts,
+  releaseStepTask(bintrayRelease in root),
+  setNextVersion,
+  commitNextVersion,
+  pushChanges
+)
