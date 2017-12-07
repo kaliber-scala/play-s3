@@ -2,7 +2,6 @@ package fly.play.s3
 
 import java.util.Date
 
-import fly.play.aws.AwsUrlEncoder
 import fly.play.aws.acl._
 import fly.play.aws.policy.Condition
 import fly.play.s3.upload.{Form, FormElement}
@@ -76,6 +75,16 @@ class S3BucketSpec extends S3SpecSetup {
       value.header(CONTENT_TYPE) must_== Some("text/plain")
     }
 
+    "be able to add a file with url encoded character" inApp {
+
+      val result = testBucket +
+        BucketFile("UrlEncodedChar'.txt", "text/plain", """
+          This is a bucket used for testing the S3 module of play
+        """.getBytes)
+
+      noException(result)
+    }
+
     "be able to check if it exists" inApp {
 
       val result = testBucket get "README.txt"
@@ -102,12 +111,12 @@ class S3BucketSpec extends S3SpecSetup {
       testBucket.list must beAnInstanceOf[Future[Iterable[BucketItem]]]
     }
 
-    "list should have a size of 2" inApp {
+    "list should have a size of 3" inApp {
 
       val result = testBucket.list
       val value = await(result)
 
-      value.size === 2
+      value.size === 3
     }
 
     "list should have the correct contents" inApp {
@@ -120,6 +129,10 @@ class S3BucketSpec extends S3SpecSetup {
         case f                               => failure("Wrong file returned: " + f)
       }
       seq(1) match {
+        case BucketItem("UrlEncodedChar'.txt", false) => success
+        case f                               => failure("Wrong file returned: " + f)
+      }
+      seq(2) match {
         case BucketItem("testPrefix/", true) => success
         case f                               => failure("Wrong file returned: " + f)
       }
@@ -401,13 +414,13 @@ class S3BucketSpec extends S3SpecSetup {
     "be able to add and delete files with 'weird' names" inApp {
 
       def uploadListAndRemoveFileWithName(prefix: String, name: String) = {
-        await(testBucket + BucketFile(AwsUrlEncoder.encodePath(prefix + name), "text/plain", "test".getBytes))
+        await(testBucket + BucketFile(prefix + name, "text/plain", "test".getBytes))
 
         await(testBucket.list(prefix)) must beLike {
           case Seq(BucketItem(itemName, false)) => itemName === (prefix + name)
         }
 
-        noException(testBucket - AwsUrlEncoder.encodePath(prefix + name))
+        noException(testBucket - (prefix + name))
       }
 
       uploadListAndRemoveFileWithName("sample/", "test file.txt")

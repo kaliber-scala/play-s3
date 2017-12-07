@@ -2,8 +2,8 @@ package fly.play.s3
 
 import play.api.libs.ws.WSClient
 import play.api.libs.ws.WSRequest
-import fly.play.aws.AwsRequestHolder
-import fly.play.aws.AwsSigner
+import fly.play.aws.{AwsRequestHolder, AwsSigner, AwsUrlEncoder}
+
 import scala.concurrent.ExecutionContext
 
 class S3Client(private val wsClient: WSClient, val signer: AwsSigner, val configuration: S3Configuration) {
@@ -17,8 +17,9 @@ class S3Client(private val wsClient: WSClient, val signer: AwsSigner, val config
     val S3Configuration(_, _, https, host, pathStyleAccess) = configuration
     val protocol = if (https) "https" else "http"
 
-    if (pathStyleAccess) s"$protocol://$host/$bucketName/$path"
-    else s"$protocol://$bucketName.$host/$path"
+    val urlEncodedPath = AwsUrlEncoder.encodePath(path)
+    if (pathStyleAccess) s"$protocol://$host/$bucketName/$urlEncodedPath"
+    else s"$protocol://$bucketName.$host/$urlEncodedPath"
   }
 }
 
