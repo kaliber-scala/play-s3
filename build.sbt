@@ -1,5 +1,4 @@
-val playVersion = "2.6.3"
-
+val playVersion = "2.7.0"
 lazy val root = (project in file("."))
   .settings(
     name := "play-s3",
@@ -10,7 +9,8 @@ lazy val root = (project in file("."))
       "com.typesafe.play" %% "play-test"   % playVersion % "test",
       "com.typesafe.play" %% "play-specs2" % playVersion % "test",
       "com.typesafe.play" %% "play-ahc-ws" % playVersion % "test",
-      "com.typesafe.play" %% "play-logback" % playVersion % "test"
+      "com.typesafe.play" %% "play-logback" % playVersion % "test",
+      "commons-codec" % "commons-codec" % "1.11" % "provided"
     )
   )
   .settings(bintraySettings: _*)
