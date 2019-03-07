@@ -154,28 +154,56 @@ object Aws4SignerSpec extends S3SpecSetup {
     "example3 PUT Object" >> {
 
       val expectedCannonicalRequest =
-        """|PUT
-           |/test%24file.text
-           |
-           |content-type:text/plain
-           |date:Fri, 24 May 2013 00:00:00 GMT
-           |host:examplebucket.s3.amazonaws.com
-           |x-amz-content-sha256:44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072
-           |x-amz-date:20130524T000000Z
-           |x-amz-storage-class:REDUCED_REDUNDANCY
-           |
-           |content-type;date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class
-           |44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072""".stripMargin
+        if (play.core.PlayVersion.current.startsWith("2.7."))
+          """|PUT
+             |/test%24file.text
+             |
+             |content-type:text/plain; charset=UTF-8
+             |date:Fri, 24 May 2013 00:00:00 GMT
+             |host:examplebucket.s3.amazonaws.com
+             |x-amz-content-sha256:44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072
+             |x-amz-date:20130524T000000Z
+             |x-amz-storage-class:REDUCED_REDUNDANCY
+             |
+             |content-type;date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class
+             |44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072""".stripMargin
+        else
+          """|PUT
+             |/test%24file.text
+             |
+             |content-type:text/plain
+             |date:Fri, 24 May 2013 00:00:00 GMT
+             |host:examplebucket.s3.amazonaws.com
+             |x-amz-content-sha256:44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072
+             |x-amz-date:20130524T000000Z
+             |x-amz-storage-class:REDUCED_REDUNDANCY
+             |
+             |content-type;date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class
+             |44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072""".stripMargin
 
       val expectedStringToSign =
-        """|AWS4-HMAC-SHA256
-           |20130524T000000Z
-           |20130524/us-east-1/s3/aws4_request
-           |0f10f84734b64a0f7ac71f28a26c6d34d07bc39df988e9e9c39bfc1fc154b6cd""".stripMargin
+        if (play.core.PlayVersion.current.startsWith("2.7."))
+          """|AWS4-HMAC-SHA256
+             |20130524T000000Z
+             |20130524/us-east-1/s3/aws4_request
+             |f8bc133040708ec4d9462312b10d102a942e6984358391d90e7df4e66d07b0e0""".stripMargin
+        else
+          """|AWS4-HMAC-SHA256
+             |20130524T000000Z
+             |20130524/us-east-1/s3/aws4_request
+             |0f10f84734b64a0f7ac71f28a26c6d34d07bc39df988e9e9c39bfc1fc154b6cd""".stripMargin
 
-      val expectedSignature = "f093977030bf8d8069918f1b3546fd02cf697d43e763c40d58c109a2e197bdac"
+      val expectedSignature =
+        if (play.core.PlayVersion.current.startsWith("2.7."))
+          "fae025cee8702959355df87bdd1215eb556e1d70417f5ce18edd46e1dab34d40"
+        else
+          "f093977030bf8d8069918f1b3546fd02cf697d43e763c40d58c109a2e197bdac"
 
-      val expectedAuthorizationHeader = "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=content-type;date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=f093977030bf8d8069918f1b3546fd02cf697d43e763c40d58c109a2e197bdac"
+      val expectedAuthorizationHeader =
+        if (play.core.PlayVersion.current.startsWith("2.7."))
+        "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=content-type;date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=fae025cee8702959355df87bdd1215eb556e1d70417f5ce18edd46e1dab34d40"
+        else
+        "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request,SignedHeaders=content-type;date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class,Signature=f093977030bf8d8069918f1b3546fd02cf697d43e763c40d58c109a2e197bdac"
 
       val signer = newSigner()
       val body = "Welcome to Amazon S3."
