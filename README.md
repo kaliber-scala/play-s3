@@ -1,3 +1,10 @@
+
+*This repository is no longer maintained*
+
+Just create a fork, if you want I can list it here.
+
+-------------
+
 Amazon Simple Storage Service (S3) module for Play 2.6
 =====================================================
 
