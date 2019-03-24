@@ -145,6 +145,9 @@ case class AwsRequestHolder(wrappedRequest: WSRequest, signer: AwsSigner, implic
   def withRequestTimeout(timeout: Duration): AwsRequestHolder =
     copy(wrappedRequest = wrappedRequest withRequestTimeout timeout)
 
+  def withUrl(url: String): AwsRequestHolder =
+    copy(wrappedRequest = wrappedRequest withUrl url)
+
   private def streamingBodyNotSupported =
     sys error
       """|A streaming body in the request is currently not supported. We could

@@ -13,6 +13,9 @@ import fly.play.aws.policy.PolicyBuilder
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import play.api.libs.ws.WSRequest
+import play.api.http.HeaderNames
+import play.shaded.ahc.org.asynchttpclient.util.HttpUtils
+import java.nio.charset.StandardCharsets.UTF_8
 
 class Aws4Signer(
   val credentials: AwsCredentials,
@@ -113,7 +116,9 @@ class Aws4Signer(
 
     val extraHeaders = (amzDate(scope) +: amzSecurityToken.toSeq).toMap
 
-    val requestWithExtraHeaders = request.copy(headers = request.headers ++ extraHeaders)
+    val requestWithExtraHeaders =
+      if (play.core.PlayVersion.current.startsWith("2.7.")) request.copy(headers = updateCharset(request.headers) ++ extraHeaders)
+      else request.copy(headers = request.headers ++ extraHeaders)
 
     val signature = createRequestSignature(scope, requestWithExtraHeaders)
 
@@ -251,4 +256,19 @@ class Aws4Signer(
   def amzSignedHeaders(headers: String) = "X-Amz-SignedHeaders" -> Seq(headers)
 
   def amzContentSha256(content: Array[Byte]) = CONTENT_SHA_HEADER_NAME -> hexHash(content)
+
+  private def updateCharset(hdrs: Map[String, Seq[String]]): Map[String, Seq[String]] = {
+    hdrs.map(kv => {
+      if (kv._1.equalsIgnoreCase(HeaderNames.CONTENT_TYPE)) {
+        val v = kv._2.map(v => {
+          val maybeCharset = Option(HttpUtils.extractContentTypeCharsetAttribute(v))
+          val charset = if (maybeCharset.isDefined) maybeCharset.get else UTF_8
+          if (v.regionMatches(true, 0, "text/", 0, 5) && maybeCharset.isEmpty)
+            v + "; charset=" + charset.name
+          else v
+        })
+        (kv._1 -> v)
+      } else (kv._1 -> kv._2)
+    })
+  }
 }

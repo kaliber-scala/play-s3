@@ -17,6 +17,10 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
 
+import org.junit.runner.RunWith
+import org.specs2.runner.JUnitRunner
+
+@RunWith(classOf[JUnitRunner])
 class S3BucketSpec extends S3SpecSetup {
   sequential
 
@@ -73,7 +77,9 @@ class S3BucketSpec extends S3SpecSetup {
       val result = S3.fromApplication.get(testBucket.name, Some("README.txt"), None, None, None)
       val value = await(result)
 
-      value.header(CONTENT_TYPE) must_== Some("text/plain")
+      if (play.core.PlayVersion.current.startsWith("2.7."))
+        value.header(CONTENT_TYPE) must_== Some("text/plain; charset=UTF-8")
+      else value.header(CONTENT_TYPE) must_== Some("text/plain")
     }
 
     "be able to check if it exists" inApp {
