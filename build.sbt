@@ -47,6 +47,8 @@ scalacOptions ++= Seq("-feature", "-deprecation")
 
 parallelExecution in Test := false
 
+releaseIgnoreUntrackedFiles := true
+
 // Release
 import ReleaseTransformations._
 releasePublishArtifactsAction := PgpKeys.publishSigned.value
