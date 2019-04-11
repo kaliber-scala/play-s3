@@ -7,8 +7,8 @@ import fly.play.aws.acl._
 import fly.play.aws.policy.Condition
 import fly.play.s3.upload.{Form, FormElement}
 import play.api.http.HeaderNames.{CONTENT_TYPE, LOCATION}
-import play.api.libs.json.{JsArray, Json}
 import play.api.libs.json.Json.toJsFieldJsValueWrapper
+import play.api.libs.json.{JsArray, Json}
 import play.api.test.WsTestClient
 import utils.MultipartFormData
 
@@ -17,10 +17,6 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
 
-import org.junit.runner.RunWith
-import org.specs2.runner.JUnitRunner
-
-@RunWith(classOf[JUnitRunner])
 class S3BucketSpec extends S3SpecSetup {
   sequential
 

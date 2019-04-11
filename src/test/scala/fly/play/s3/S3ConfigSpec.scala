@@ -1,8 +1,6 @@
 package fly.play.s3
 
-import com.typesafe.config.ConfigFactory
 import fly.play.aws.SimpleAwsCredentials
-import play.api.Application
 import play.api.Configuration
 import play.api.libs.ws.WSClient
 
