@@ -14,7 +14,6 @@ trait S3SpecSetup extends Specification {
   def testBucketName(implicit app: Application) =
     app.configuration.getOptional[String]("testBucketName").getOrElse(sys.error("Could not find testBucketName in configuration"))
 
-
   def fakeApplication(additionalConfiguration: Map[String, _ <: Any] = Map.empty) =
     new GuiceApplicationBuilder().configure(additionalConfiguration).build()
 

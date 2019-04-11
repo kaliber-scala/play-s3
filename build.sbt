@@ -45,9 +45,7 @@ lazy val bintraySettings = Seq(
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
-fork in Test := true
-
-javaOptions in Test += "-Dconfig.file=test/conf/application.conf"
+parallelExecution in Test := false
 
 // Release
 import ReleaseTransformations._
